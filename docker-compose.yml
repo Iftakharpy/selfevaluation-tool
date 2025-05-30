@@ -1,0 +1,33 @@
+services:
+  survey-api:
+    build:
+      context: ./api/
+      dockerfile: Dockerfile
+    # In production api is not directly exposed
+    # nginx will route certain traffic to api
+    # ports:
+    #   - "8000:8000"    
+    restart: always
+
+  # Nginx will serve the static ui files from react/ui
+  nginx-proxy:
+    depends_on: 
+      - survey-api
+    build: 
+      context: ./ui/
+      dockerfile: Dockerfile
+    ports: 
+      - "80:80"
+    restart: always
+
+  mongodb:
+    image: mongo:latest # Use the official MongoDB image
+    container_name: mongodb_container # Optional: give your container a name
+    ports:
+      - "27017:27017" # Expose the default MongoDB port
+    volumes:
+      - mongodb_data:/data/db # Persist data to a named volume
+    restart: always
+
+volumes:
+  mongodb_data: # Define the named volume
