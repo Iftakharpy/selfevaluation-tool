@@ -86,18 +86,57 @@ def test_create_qca_fail_invalid_course_id(authenticated_teacher_data_and_client
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert "Course with ID" in response.json()["detail"]
 
-def test_create_qca_fail_as_student(authenticated_student_data_and_client: tuple[TestClient, dict], client: TestClient):
-    # Need teacher to create prerequisites
-    teacher_client_tuple = client.post("/api/v1/users/signup", json={"username": f"teacher_qca_{uuid.uuid4().hex[:4]}@example.com", "display_name": "Temp Teacher", "role": "teacher", "password": "password"}).json()
-    client.post("/api/v1/users/login", json={"username": teacher_client_tuple["username"], "password": "password"})
-    
-    course = create_test_course(client, uuid.uuid4().hex[:6]) # Created by teacher
-    question = create_test_question(client, uuid.uuid4().hex[:6]) # Created by teacher
 
-    student_client, _ = authenticated_student_data_and_client # Student logs in
+def test_create_qca_fail_as_student(
+    # We still need the fixtures to create the users
+    authenticated_teacher_data_and_client: tuple[TestClient, dict],
+    authenticated_student_data_and_client: tuple[TestClient, dict]
+):
+    # Get the shared client instance and user details from fixtures
+    # The fixtures will run once before this, student will be logged in last by fixture execution.
+    # We will override this.
+    client, teacher_details_from_fixture = authenticated_teacher_data_and_client
+    _, student_details_from_fixture = authenticated_student_data_and_client # client is the same instance
+
+    # --- Teacher's turn ---
+    teacher_login_payload = {"username": teacher_details_from_fixture["username"], "password": "testpassword"}
+    login_res_teacher = client.post("/api/v1/users/login", json=teacher_login_payload)
+    assert login_res_teacher.status_code == HTTPStatus.OK, f"Teacher login failed: {login_res_teacher.text}"
+    
+    # Verify teacher is logged in
+    me_response_teacher = client.get("/api/v1/users/me")
+    assert me_response_teacher.status_code == HTTPStatus.OK
+    assert me_response_teacher.json()["username"] == teacher_details_from_fixture["username"]
+
+    # Create prerequisite resources
+    course = create_test_course(client, uuid.uuid4().hex[:6]) # Use the shared client
+    question = create_test_question(client, uuid.uuid4().hex[:6]) # Use the shared client
+
+    # --- Student's turn ---
+    # No need to logout first if the new login correctly establishes a new session and cookie.
+    # If issues persisted, an explicit logout here would be the next step.
+    student_login_payload = {"username": student_details_from_fixture["username"], "password": "testpassword"}
+    login_res_student = client.post("/api/v1/users/login", json=student_login_payload)
+    assert login_res_student.status_code == HTTPStatus.OK, f"Student login failed: {login_res_student.text}"
+
+    # Verify student is logged in
+    me_response_student = client.get("/api/v1/users/me")
+    assert me_response_student.status_code == HTTPStatus.OK
+    assert me_response_student.json()["username"] == student_details_from_fixture["username"]
+    
+    # Perform the action as student
     qca_payload = {"question_id": question["id"], "course_id": course["id"]}
-    response = student_client.post("/api/v1/question-course-associations/", json=qca_payload)
+    
+    response = client.post("/api/v1/question-course-associations/", json=qca_payload) # Use the shared client
+
     assert response.status_code == HTTPStatus.FORBIDDEN
+
+    try:
+        detail = response.json()["detail"]
+        assert "Teacher role required" in detail
+    except (KeyError, TypeError, AttributeError):
+        assert False, "Response JSON did not contain 'detail', was not valid JSON, or 'detail' was not a string."
+
 
 def test_list_qcas_success_as_teacher(authenticated_teacher_data_and_client: tuple[TestClient, dict]):
     client, _ = authenticated_teacher_data_and_client

@@ -52,7 +52,7 @@ def client(database_warning_and_final_cleanup) -> Generator[TestClient, None, No
 
 
 @pytest.fixture(scope="function")
-def authenticated_student_data_and_client(client: TestClient) -> tuple[TestClient, dict]: # Return client and user data
+def authenticated_student_data_and_client(client: TestClient) -> tuple[TestClient, dict]:
     unique_suffix = uuid.uuid4().hex[:8]
     user_data = {
         "username": f"student_{unique_suffix}@example.com",
@@ -63,17 +63,18 @@ def authenticated_student_data_and_client(client: TestClient) -> tuple[TestClien
     signup_response = client.post("/api/v1/users/signup", json=user_data)
     assert signup_response.status_code == 201, f"Student signup failed: {signup_response.text}"
     
-    # The response from signup already contains the created user's details (excluding password hash)
-    created_user_details = signup_response.json() 
+    created_user_details = signup_response.json()
 
     login_data = {"username": user_data["username"], "password": user_data["password"]}
     login_response = client.post("/api/v1/users/login", json=login_data)
-    assert login_response.status_code == 200, f"Student login failed: {login_response.text}"
-    
-    return client, created_user_details # Return both
+    assert login_response.status_code == 200, f"Student login failed within fixture: {login_response.text}"
+    # Add an explicit check for the cookie here too
+    assert "session" in client.cookies, "Session cookie not found in client after login within student fixture"
+        
+    return client, created_user_details
 
 @pytest.fixture(scope="function")
-def authenticated_teacher_data_and_client(client: TestClient) -> tuple[TestClient, dict]: # Return client and user data
+def authenticated_teacher_data_and_client(client: TestClient) -> tuple[TestClient, dict]:
     unique_suffix = uuid.uuid4().hex[:8]
     user_data = {
         "username": f"teacher_{unique_suffix}@example.com",
@@ -88,8 +89,13 @@ def authenticated_teacher_data_and_client(client: TestClient) -> tuple[TestClien
 
     login_data = {"username": user_data["username"], "password": user_data["password"]}
     login_response = client.post("/api/v1/users/login", json=login_data)
-    assert login_response.status_code == 200, f"Teacher login failed: {login_response.text}"
+
+    assert login_response.status_code == 200, f"Teacher login failed within fixture: {login_response.text}"
+    # Add an explicit check for the cookie here too
+    assert "session" in client.cookies, "Session cookie not found in client after login within teacher fixture"
     return client, created_user_details
+
+
 
 @pytest.fixture(scope="function", autouse=True)
 def auto_db_cleanup(client: TestClient): 
