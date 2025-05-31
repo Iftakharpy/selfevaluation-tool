@@ -1,4 +1,5 @@
 - [Project info](#project-info)
+	- [Frontend pages](#frontend-pages)
 	- [Production environment setup guide](#production-environment-setup-guide)
 	- [Development environment setup guide](#development-environment-setup-guide)
 		- [FastAPI backend](#fastapi-backend)
@@ -12,6 +13,27 @@ This project is separated in two parts UI and API for development ease. These ar
 2. React UI which communicates with the FastAPI endpoints.
 
 > Current implemented functionalities of the API's and UI can be seen by running the project with docker following the steps in the [production](#production-environment-setup-guide) or [development](#development-environment-setup-guide).
+
+
+
+
+## Frontend pages
+Implementation reference: https://www.16personalities.com/
+- navbar, 
+
+- Home
+- Survey
+  - Edit/create/delete - for teachers
+  - Once created can't be modified
+  - Take survey - with link provided by teachers
+
+- Courses - only for teachers
+  - Questions
+
+- Result - view only for teachers and students
+  - there are only 3 results for now
+  - 
+
 
 
 ## Production environment setup guide
