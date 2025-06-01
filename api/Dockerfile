@@ -1,4 +1,7 @@
-FROM python:3.13.3
+FROM python:3.13-slim
+
+# Update system packages to reduce vulnerabilities
+RUN apt-get update && apt-get upgrade -y && apt-get clean
 
 
 WORKDIR /root/

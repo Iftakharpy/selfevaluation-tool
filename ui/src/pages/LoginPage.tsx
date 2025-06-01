@@ -2,15 +2,19 @@ import React, { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifier } from '../contexts/NotificationContext';
+import Input from '../components/forms/Input';
+import Button from '../components/forms/Button';
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState(''); // email
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { loginUser, isAuthenticated, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
+  const { addNotification } = useNotifier();
 
   useEffect(() => {
     if (!authIsLoading && isAuthenticated) {
@@ -21,16 +25,17 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
       await loginUser({ username, password });
-      navigate('/', { replace: true }); // Redirect to home on successful login
+      addNotification('Logged in successfully!', 'success'); // Example success
+      navigate('/', { replace: true });
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Login failed. Please try again.';
-      setError(errorMessage);
-      console.log(errorMessage); // Log the error for debugging
+      setError(errorMessage); // Local form error
+      addNotification(errorMessage, 'error'); // Global notification
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -52,58 +57,51 @@ const LoginPage: React.FC = () => {
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
               <strong className="font-bold">Error: </strong>
               <span className="block sm:inline">{error}</span>
             </div>
           )}
-          <input type="hidden" name="remember" defaultValue="true" />
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email-address" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300"
-            >
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </div>
+          
+          <Input
+            id="email-address"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            placeholder="Email address"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            disabled={isSubmitting}
+            label="Email address"
+            labelClassName="sr-only" // Hide label visually but keep for accessibility
+            inputClassName="rounded-t-md" // Adjust for stacked inputs
+            containerClassName="mb-0"
+          />
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isSubmitting}
+            label="Password"
+            labelClassName="sr-only"
+            inputClassName="rounded-b-md"
+            containerClassName="mb-0 -mt-px" // Negative margin to stack borders
+          />
+          
+          <Button
+            type="submit"
+            isLoading={isSubmitting}
+            fullWidth
+            className="mt-6"
+          >
+            Sign in
+          </Button>
         </form>
         <div className="text-sm text-center">
           <p>
