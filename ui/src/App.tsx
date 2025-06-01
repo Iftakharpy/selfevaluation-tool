@@ -14,12 +14,12 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage'; 
 import TeacherDashboardPage from './pages/TeacherDashboardPage';
 import SurveyListPage from './pages/SurveyListPage';
+import TakeSurveyPage from './pages/TakeSurveyPage';      
+import MyAttemptsPage from './pages/MyAttemptsPage';      
+import SurveyResultsPage from './pages/SurveyResultsPage';
 // Import other page components as you create them
 // import CoursesPage from './pages/CoursesPage';
 // import QuestionsPage from './pages/QuestionsPage';
-// import TakeSurveyPage from './pages/TakeSurveyPage';
-// import SurveyResultsPage from './pages/SurveyResultsPage';
-// import MyAttemptsPage from './pages/MyAttemptsPage';
 
 
 function App() {
@@ -29,7 +29,6 @@ function App() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <p className="text-xl text-gray-700">Initializing Application...</p>
-        {/* You can add a more sophisticated loader/spinner here */}
       </div>
     );
   }
@@ -56,7 +55,7 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        {/* <Route 
+        <Route 
           path="/my-attempts" 
           element={
             <ProtectedRoute allowedRoles={['student']}>
@@ -75,11 +74,11 @@ function App() {
         <Route 
           path="/results/:attemptId" 
           element={
-            <ProtectedRoute> 
+            <ProtectedRoute>
               <SurveyResultsPage />
             </ProtectedRoute>
           } 
-        /> */}
+        />
         
         {/* Teacher-specific routes */}
         <Route 
@@ -106,10 +105,8 @@ function App() {
             </ProtectedRoute>
           } 
         /> */}
-        {/* Add more teacher routes for creating/editing courses, questions, surveys */}
       </Route>
       
-      {/* Fallback for unknown routes */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
