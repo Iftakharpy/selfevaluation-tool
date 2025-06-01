@@ -1,8 +1,8 @@
-# FilePath: C:\Users\iftak\Desktop\jamk\2025 Spring\narsus-self-evaluation-tool\api\app\surveys\router.py
 from fastapi import APIRouter, HTTPException, status, Depends, Query
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from bson import ObjectId
 from datetime import datetime, UTC
+import random # MODIFIED: Added import for random
 
 from app.core.db import (
     get_survey_collection, 
@@ -15,7 +15,8 @@ from app.core.db import (
 from app.users.auth import require_teacher_role, get_current_active_user
 from app.users.data_types import UserInDB, PyObjectId, RoleEnum
 from .data_types import (
-    SurveyCreate, SurveyUpdate, SurveyOut, SurveyInDB, SurveyQuestionDetail, ScoreFeedbackItem
+    SurveyCreate, SurveyUpdate, SurveyOut, SurveyInDB, SurveyQuestionDetail, 
+    ScoreFeedbackItem, OutcomeThresholdItem # MODIFIED: Added OutcomeThresholdItem
 )
 from app.questions.data_types import AnswerTypeEnum 
 
@@ -35,11 +36,6 @@ async def _get_survey_question_details(survey: SurveyInDB) -> List[SurveyQuestio
     qcas_cursor = qca_collection.find({"course_id": {"$in": survey.course_ids}})
     async for qca in qcas_cursor:
         question_id = qca["question_id"]
-        # The set processed_question_ids ensures each question appears once, even if linked via multiple QCAs
-        # to different courses within the same survey OR multiple times to the same course (though latter is less likely).
-        # Current logic: if a question is tied to CourseA and CourseB (both in survey),
-        # it will appear once, associated with the first QCA encountered.
-        # If specific ordering or per-course context for *displaying* questions is needed, this might need adjustment.
         if question_id in processed_question_ids:
             continue 
 
@@ -56,10 +52,8 @@ async def _get_survey_question_details(survey: SurveyInDB) -> List[SurveyQuestio
             )
             survey_questions_details.append(sqd)
             processed_question_ids.add(question_id)
-            
-    # Current behavior: Questions are ordered by the database fetch order of QCAs.
-    # For more robust or specific ordering (e.g., by course, then by question title, or manually defined),
-    # additional logic would be needed here or by storing order information in the Survey/QCA.
+    
+    random.shuffle(survey_questions_details) # MODIFIED: Shuffle questions for basic randomization
     return survey_questions_details
 
 def _prepare_survey_dict_for_out(survey_dict_from_db: dict) -> dict:
@@ -71,17 +65,37 @@ def _prepare_survey_dict_for_out(survey_dict_from_db: dict) -> dict:
     if "course_ids" in survey_dict_from_db:
         survey_dict_from_db["course_ids"] = [str(cid) for cid in survey_dict_from_db["course_ids"]]
     
-    # Ensure course_skill_total_score_thresholds keys (course_ids) are strings
     if "course_skill_total_score_thresholds" in survey_dict_from_db and survey_dict_from_db["course_skill_total_score_thresholds"]:
         new_thresholds = {}
         for k, v in survey_dict_from_db["course_skill_total_score_thresholds"].items():
-            new_thresholds[str(k)] = v # Ensure key is string
+            new_thresholds[str(k)] = v 
         survey_dict_from_db["course_skill_total_score_thresholds"] = new_thresholds
-    elif "course_skill_total_score_thresholds" not in survey_dict_from_db: # Ensure field exists for model validation
+    elif "course_skill_total_score_thresholds" not in survey_dict_from_db:
         survey_dict_from_db["course_skill_total_score_thresholds"] = {}
 
+    # MODIFIED: Handle new course_outcome_thresholds field
+    if "course_outcome_thresholds" in survey_dict_from_db and survey_dict_from_db["course_outcome_thresholds"]:
+        new_outcome_thresholds = {}
+        for k, v in survey_dict_from_db["course_outcome_thresholds"].items():
+            new_outcome_thresholds[str(k)] = v
+        survey_dict_from_db["course_outcome_thresholds"] = new_outcome_thresholds
+    elif "course_outcome_thresholds" not in survey_dict_from_db:
+         survey_dict_from_db["course_outcome_thresholds"] = {}
 
     return survey_dict_from_db
+
+def _validate_threshold_keys(
+    threshold_dict: Optional[Dict[str, List[Any]]], 
+    survey_course_ids: List[PyObjectId], 
+    field_name: str
+):
+    if threshold_dict:
+        for course_id_str, _ in threshold_dict.items():
+            if not ObjectId.is_valid(course_id_str) or not any(PyObjectId(course_id_str) == cid for cid in survey_course_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid or non-survey course ID '{course_id_str}' in {field_name}."
+                )
 
 @SurveyRouter.post("/", response_model=SurveyOut, status_code=status.HTTP_201_CREATED)
 async def create_survey(
@@ -100,22 +114,20 @@ async def create_survey(
                     detail=f"Course with ID '{str(course_id_obj)}' not found."
                 )
     
-    # Validate course_skill_total_score_thresholds if provided
-    if survey_in.course_skill_total_score_thresholds:
-        for course_id_str, _ in survey_in.course_skill_total_score_thresholds.items():
-            if not ObjectId.is_valid(course_id_str) or not any(PyObjectId(course_id_str) == cid for cid in survey_in.course_ids):
-                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid or non-survey course ID '{course_id_str}' in course_skill_total_score_thresholds."
-                )
-
+    _validate_threshold_keys(
+        survey_in.course_skill_total_score_thresholds, 
+        survey_in.course_ids, 
+        "course_skill_total_score_thresholds"
+    )
+    _validate_threshold_keys(
+        survey_in.course_outcome_thresholds,
+        survey_in.course_ids,
+        "course_outcome_thresholds"
+    )
+            
     survey_db_data = survey_in.model_dump()
     survey_db_data["created_by"] = current_user.id 
-    
-    # Convert string keys in course_skill_total_score_thresholds to PyObjectId for DB storage if needed
-    # However, Pydantic model with Dict[str, ...] expects string keys.
-    # If storing with ObjectId keys in DB, conversion needed here. Sticking to str keys for simplicity.
-    
+        
     survey_db_obj = SurveyInDB(**survey_db_data) 
     
     result = await survey_collection.insert_one(survey_db_obj.model_dump(by_alias=True))
@@ -140,7 +152,7 @@ async def list_surveys(
 
     if current_user.role == RoleEnum.student:
         query["is_published"] = True
-    elif published_only is not None: # Teacher can filter
+    elif published_only is not None: 
         query["is_published"] = published_only
         
     surveys_cursor = survey_collection.find(query).skip(skip).limit(limit).sort("created_at", -1)
@@ -200,26 +212,30 @@ async def update_survey(
     
     update_data["updated_at"] = datetime.now(UTC)
 
-    # Validate course_ids if they are being updated
+    effective_course_ids_pyobj = update_data.get(
+        "course_ids", 
+        [PyObjectId(cid_str) for cid_str in existing_survey_dict.get("course_ids", []) if ObjectId.is_valid(cid_str)]
+    )
+
     if "course_ids" in update_data and update_data["course_ids"] is not None:
         course_collection = get_course_collection()
-        for c_id_obj in update_data["course_ids"]: # These are PyObjectId from SurveyUpdate
+        for c_id_obj in update_data["course_ids"]: 
             if not await course_collection.find_one({"_id": c_id_obj}):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Course with ID '{str(c_id_obj)}' not found in update.")
 
-    # Validate course_skill_total_score_thresholds if provided in update
     if "course_skill_total_score_thresholds" in update_data and update_data["course_skill_total_score_thresholds"] is not None:
-        # Use the effective course_ids (either from update or existing) for validation
-        effective_course_ids_pyobj = update_data.get("course_ids", [PyObjectId(cid_str) for cid_str in existing_survey_dict.get("course_ids", [])])
-        
-        for course_id_str, _ in update_data["course_skill_total_score_thresholds"].items():
-            if not ObjectId.is_valid(course_id_str) or not any(PyObjectId(course_id_str) == cid for cid in effective_course_ids_pyobj):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid or non-survey course ID '{course_id_str}' in course_skill_total_score_thresholds during update."
-                )
-        # Pydantic model expects Dict[str, List[ScoreFeedbackItem]], so keys are already strings.
-        # If database stores ObjectId keys, conversion would be needed for $set. Sticking to string keys.
+        _validate_threshold_keys(
+            update_data["course_skill_total_score_thresholds"],
+            effective_course_ids_pyobj,
+            "course_skill_total_score_thresholds"
+        )
+    
+    if "course_outcome_thresholds" in update_data and update_data["course_outcome_thresholds"] is not None:
+        _validate_threshold_keys(
+            update_data["course_outcome_thresholds"],
+            effective_course_ids_pyobj,
+            "course_outcome_thresholds"
+        )
 
     await survey_collection.update_one({"_id": PyObjectId(survey_id)}, {"$set": update_data})
     updated_survey_dict_from_db = await survey_collection.find_one({"_id": PyObjectId(survey_id)})
@@ -246,8 +262,6 @@ async def delete_survey(
     if existing_survey["created_by"] != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this survey.")
     
-    # Check if survey has any submitted attempts. If so, prevent deletion.
-    # A softer approach might be to "archive" the survey instead.
     attempt_collection = get_survey_attempt_collection()
     submitted_attempt = await attempt_collection.find_one({"survey_id": survey_obj_id, "is_submitted": True})
     if submitted_attempt:
@@ -258,16 +272,13 @@ async def delete_survey(
 
     delete_result = await survey_collection.delete_one({"_id": survey_obj_id})
     if delete_result.deleted_count == 0:
-        # This case should be caught by the find_one above, but as a safeguard.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found or already deleted.")
     
-    # Cascade delete associated survey attempts (unsubmitted) and their answers
     student_answer_collection = get_student_answer_collection()
     
-    attempts_to_delete_cursor = attempt_collection.find({"survey_id": survey_obj_id}) # Will only be unsubmitted ones
+    attempts_to_delete_cursor = attempt_collection.find({"survey_id": survey_obj_id}) 
     async for attempt in attempts_to_delete_cursor:
         await student_answer_collection.delete_many({"survey_attempt_id": attempt["_id"]})
     await attempt_collection.delete_many({"survey_id": survey_obj_id})
     
     return None
-    

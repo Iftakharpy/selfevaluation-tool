@@ -1,4 +1,3 @@
-# FilePath: api/app/questions/data_types.py
 from __future__ import annotations
 from pydantic import BaseModel, Field, ConfigDict, model_validator, ValidationInfo # Ensure ValidationInfo is imported
 from typing import Optional, Annotated, List, Dict, Any

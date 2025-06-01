@@ -1,4 +1,3 @@
-# FilePath: api/tests/test_qca_routes.py
 from fastapi.testclient import TestClient
 from http import HTTPStatus
 import uuid

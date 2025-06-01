@@ -1,5 +1,3 @@
-# FilePath: api/tests/test_user_routes.py
-# import pytest # No longer need pytest.mark.asyncio
 from fastapi.testclient import TestClient # For type hinting
 from http import HTTPStatus
 

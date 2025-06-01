@@ -1,4 +1,3 @@
-# FilePath: api/app/qca/router.py
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import List, Optional
 from bson import ObjectId

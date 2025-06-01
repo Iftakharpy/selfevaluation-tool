@@ -1,5 +1,3 @@
-# FilePath: C:\Users\iftak\Desktop\jamk\2025 Spring\narsus-self-evaluation-tool\api\tests\test_question_routes.py
-# FilePath: api/tests/test_question_routes.py
 from fastapi.testclient import TestClient
 from http import HTTPStatus
 import uuid 

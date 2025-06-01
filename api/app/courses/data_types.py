@@ -1,4 +1,3 @@
-# FilePath: api/app/courses/data_types.py
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from app.users.data_types import PyObjectId 

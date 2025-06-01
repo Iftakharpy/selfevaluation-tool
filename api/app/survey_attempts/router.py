@@ -1,4 +1,3 @@
-# FilePath: C:\Users\iftak\Desktop\jamk\2025 Spring\narsus-self-evaluation-tool\api\app\survey_attempts\router.py
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import List, Optional, Dict, Any, Tuple 
 from bson import ObjectId
@@ -12,11 +11,17 @@ from app.core.db import (
     get_qca_collection,
     get_course_collection
 )
-from app.users.auth import get_current_active_user, require_teacher_role # MODIFIED: Added require_teacher_role
+from app.users.auth import get_current_active_user, require_teacher_role 
 from app.users.data_types import UserInDB, PyObjectId, RoleEnum
-from app.surveys.data_types import SurveyInDB, ScoreFeedbackItem as SurveyScoreFeedbackItem # MODIFIED: For survey-level feedback
+from app.surveys.data_types import (
+    SurveyInDB, 
+    ScoreFeedbackItem as SurveyScoreFeedbackItem,
+    OutcomeThresholdItem, # MODIFIED: Import OutcomeThresholdItem
+    OutcomeCategoryEnum   # MODIFIED: Import OutcomeCategoryEnum
+)
 from app.surveys.router import _get_survey_question_details 
 from app.questions.data_types import ScoreFeedbackItem as QuestionScoreFeedbackItem, FeedbackComparisonEnum, AnswerTypeEnum 
+from app.qca.data_types import AnswerAssociationTypeEnum # MODIFIED: Import AnswerAssociationTypeEnum
 from .data_types import (
     SurveyAttemptCreateRequest, SurveyAttemptStartOut, SurveyAttemptOut, 
     StudentAnswerPayload, StudentAnswerInDB, StudentAnswerOut,
@@ -40,6 +45,9 @@ def _prepare_survey_attempt_dict_for_out(attempt_dict_from_db: dict) -> dict:
     for field in ["student_id", "survey_id"]:
         if field in attempt_dict_from_db and isinstance(attempt_dict_from_db[field], ObjectId):
             attempt_dict_from_db[field] = str(attempt_dict_from_db[field])
+    # MODIFIED: Ensure course_outcome_categorization is present if it's empty, for model validation
+    if "course_outcome_categorization" not in attempt_dict_from_db:
+        attempt_dict_from_db["course_outcome_categorization"] = {}
     return attempt_dict_from_db
 
 
@@ -72,7 +80,7 @@ async def calculate_score_for_answer(question_dict: Dict, student_answer_value: 
         correct_keys = set(rules.get("correct_option_keys", []))
         option_scores = rules.get("option_scores")
         score_per_correct = float(rules.get("score_per_correct", 1.0))
-        penalty_per_incorrect = float(rules.get("penalty_per_incorrect", 0.0)) # ensure this can be negative
+        penalty_per_incorrect = float(rules.get("penalty_per_incorrect", 0.0)) 
         selected_keys = set(student_answer_value)
         if option_scores and isinstance(option_scores, dict):
             for sel_key in selected_keys:
@@ -80,20 +88,20 @@ async def calculate_score_for_answer(question_dict: Dict, student_answer_value: 
         else:
             for key in selected_keys:
                 if key in correct_keys: score += score_per_correct
-                elif key in options: score += penalty_per_incorrect # This adds penalty if selected and not correct
-        # score = max(0, score) # Optional: prevent negative total score for a question
+                elif key in options: score += penalty_per_incorrect 
+        # score = max(0, score) # Optional
 
     elif q_type == AnswerTypeEnum.input:
         expected_answers = rules.get("expected_answers", [])
         default_score = float(rules.get("default_incorrect_score", 0.0))
-        score = default_score # Start with default (incorrect)
-        if isinstance(student_answer_value, str): # Ensure it's a string to compare
-            for expected in expected_answers: # expected is a dict {"text": "...", "score": ..., "case_sensitive": ...}
+        score = default_score 
+        if isinstance(student_answer_value, str): 
+            for expected in expected_answers: 
                 expected_text = expected.get("text", "")
                 case_sensitive = expected.get("case_sensitive", False)
                 match = (student_answer_value == expected_text) if case_sensitive else (student_answer_value.lower() == expected_text.lower())
                 if match:
-                    score = float(expected.get("score", default_score)) # Use specific score if matched
+                    score = float(expected.get("score", default_score)) 
                     break 
     
     elif q_type == AnswerTypeEnum.range:
@@ -101,13 +109,12 @@ async def calculate_score_for_answer(question_dict: Dict, student_answer_value: 
             val = float(student_answer_value)
             target = float(rules.get("target_value", 0.0))
             score_at_target = float(rules.get("score_at_target", 0.0))
-            # score_per_deviation_unit usually negative or zero if penalizing deviation
             score_per_dev = float(rules.get("score_per_deviation_unit", 0.0)) 
             score = score_at_target + (abs(val - target) * score_per_dev)
-        except (ValueError, TypeError): score = 0.0 # Non-numeric answer for range
+        except (ValueError, TypeError): score = 0.0
     return score
 
-# --- Enhanced Feedback Generation Function ---
+# --- Enhanced Feedback and Outcome Generation Functions ---
 def _evaluate_feedback_rules(
     score: float, 
     feedback_rules_input: Optional[List[QuestionScoreFeedbackItem | SurveyScoreFeedbackItem | Dict]]
@@ -120,9 +127,6 @@ def _evaluate_feedback_rules(
             feedback_rules_validated.append(rule_input)
         elif isinstance(rule_input, dict):
             try:
-                # Try to parse as QuestionScoreFeedbackItem, fallback to SurveyScoreFeedbackItem if needed
-                # (assuming they have compatible structures or a common base if defined)
-                # For this example, assume QuestionScoreFeedbackItem is the common structure from DB.
                 feedback_rules_validated.append(QuestionScoreFeedbackItem.model_validate(rule_input))
             except Exception as e:
                 print(f"Warning: Could not parse feedback rule dict: {rule_input}, error: {e}")
@@ -131,11 +135,9 @@ def _evaluate_feedback_rules(
             print(f"Warning: Invalid type for feedback rule: {type(rule_input)}")
             continue
 
-    for rule in feedback_rules_validated: # Now iterate over validated Pydantic objects
+    for rule in feedback_rules_validated: 
         match = False
-        # Ensure rule.score_value is float if score is float
         rule_score_value = float(rule.score_value)
-
         if rule.comparison == FeedbackComparisonEnum.lt: match = score < rule_score_value
         elif rule.comparison == FeedbackComparisonEnum.lte: match = score <= rule_score_value
         elif rule.comparison == FeedbackComparisonEnum.gt: match = score > rule_score_value
@@ -145,52 +147,93 @@ def _evaluate_feedback_rules(
         if match: return rule.feedback
     return None
 
-async def generate_all_feedback_for_attempt(
-    attempt_dict: Dict, survey_obj: SurveyInDB, student_answers_list_with_scores: List[Dict],
-    qca_collection, question_collection # course_collection not directly needed here now
-) -> Tuple[Dict[str, str], Dict[str, List[str]], Optional[str]]:
-    
-    course_scores = attempt_dict.get("course_scores", {}) # Dict[str_course_id, float_score]
-    final_overall_course_feedback: Dict[str, str] = {} # Dict[str_course_id, str_feedback]
-    detailed_feedback_per_course: Dict[str, List[str]] = {str(cid): [] for cid in course_scores.keys()}
+# MODIFIED: New helper for outcome categorization
+def _evaluate_outcome_rules(
+    score: float,
+    outcome_rules_input: Optional[List[OutcomeThresholdItem | Dict]]
+) -> OutcomeCategoryEnum:
+    if not outcome_rules_input: return OutcomeCategoryEnum.UNDEFINED
 
-    # Generate detailed feedback from individual question answers
+    outcome_rules_validated: List[OutcomeThresholdItem] = []
+    for rule_input in outcome_rules_input:
+        if isinstance(rule_input, OutcomeThresholdItem):
+            outcome_rules_validated.append(rule_input)
+        elif isinstance(rule_input, dict):
+            try:
+                outcome_rules_validated.append(OutcomeThresholdItem.model_validate(rule_input))
+            except Exception as e:
+                print(f"Warning: Could not parse outcome rule dict: {rule_input}, error: {e}")
+                continue
+        else:
+             print(f"Warning: Invalid type for outcome rule: {type(rule_input)}")
+             continue
+    
+    # Sort rules: typically, you'd want to evaluate in a specific order,
+    # e.g., more specific (lower 'lt' values) before broader ones, or based on score_value.
+    # For simplicity, we'll take the first match based on list order.
+    # A more robust system might sort by score_value and comparison type.
+    outcome_rules_validated.sort(key=lambda r: (r.score_value, r.comparison.value))
+
+
+    for rule in outcome_rules_validated:
+        match = False
+        rule_score_value = float(rule.score_value)
+        if rule.comparison == FeedbackComparisonEnum.lt: match = score < rule_score_value
+        elif rule.comparison == FeedbackComparisonEnum.lte: match = score <= rule_score_value
+        elif rule.comparison == FeedbackComparisonEnum.gt: match = score > rule_score_value
+        elif rule.comparison == FeedbackComparisonEnum.gte: match = score >= rule_score_value
+        elif rule.comparison == FeedbackComparisonEnum.eq: match = score == rule_score_value
+        elif rule.comparison == FeedbackComparisonEnum.neq: match = score != rule_score_value
+        if match: return rule.outcome
+    return OutcomeCategoryEnum.UNDEFINED
+
+
+async def generate_all_feedback_and_outcomes_for_attempt( # MODIFIED: Renamed and updated return type
+    attempt_dict: Dict, survey_obj: SurveyInDB, student_answers_list_with_scores: List[Dict],
+    qca_collection, question_collection
+) -> Tuple[Dict[str, str], Dict[str, List[str]], Optional[str], Dict[str, OutcomeCategoryEnum]]: # MODIFIED: Added outcome dict to tuple
+    
+    course_scores = attempt_dict.get("course_scores", {}) 
+    final_overall_course_feedback: Dict[str, str] = {} 
+    detailed_feedback_per_course: Dict[str, List[str]] = {str(cid): [] for cid in course_scores.keys()}
+    final_course_outcome_categories: Dict[str, OutcomeCategoryEnum] = {} # MODIFIED: New dict for outcomes
+
     for ans_with_score_dict in student_answers_list_with_scores:
         qca = await qca_collection.find_one({"_id": ans_with_score_dict["qca_id"]})
         question = await question_collection.find_one({"_id": ans_with_score_dict["question_id"]})
         if not qca or not question: continue
 
         ans_score = ans_with_score_dict.get("score_achieved", 0.0)
-        course_id_str = str(qca["course_id"]) # This answer contributes to this course
+        course_id_str = str(qca["course_id"]) 
         
-        # QCA-specific feedback has priority, then question's default feedback
         feedback_msg = _evaluate_feedback_rules(ans_score, qca.get("feedbacks_based_on_score")) or \
                        _evaluate_feedback_rules(ans_score, question.get("default_feedbacks_on_score"))
         
         if feedback_msg:
-            if course_id_str not in detailed_feedback_per_course: # Should already be initialized
+            if course_id_str not in detailed_feedback_per_course:
                  detailed_feedback_per_course[course_id_str] = []
             detailed_feedback_per_course[course_id_str].append(f"Q: {question['title']}: {feedback_msg}")
 
-    # Generate overall feedback for each course based on survey's rules for total course scores
-    if survey_obj.course_skill_total_score_thresholds:
+    if survey_obj.course_skill_total_score_thresholds or survey_obj.course_outcome_thresholds:
         for course_id_str, total_score_for_course in course_scores.items():
-            # Find feedback rules for this course_id_str in the survey
+            # Feedback
             course_feedback_rules = survey_obj.course_skill_total_score_thresholds.get(course_id_str)
             if course_feedback_rules:
                 overall_fb_for_course = _evaluate_feedback_rules(total_score_for_course, course_feedback_rules)
                 if overall_fb_for_course:
                     final_overall_course_feedback[course_id_str] = overall_fb_for_course
-            
-            if course_id_str not in final_overall_course_feedback: # Fallback if no rule matched
+            if course_id_str not in final_overall_course_feedback:
                  final_overall_course_feedback[course_id_str] = "Please review your performance for this course section."
 
+            # Outcome Categorization (MODIFIED)
+            course_outcome_rules = survey_obj.course_outcome_thresholds.get(course_id_str) # Fetch from PyObjectId keys if stored that way
+            category = _evaluate_outcome_rules(total_score_for_course, course_outcome_rules)
+            final_course_outcome_categories[course_id_str] = category
 
-    # Overall survey feedback (e.g., based on average of all course scores, or some other logic)
-    # This part is still a placeholder, as SRS doesn't specify how this is derived.
+
     overall_survey_feedback_str = "Thank you for completing the survey. Your results are summarized above." 
     
-    return final_overall_course_feedback, detailed_feedback_per_course, overall_survey_feedback_str
+    return final_overall_course_feedback, detailed_feedback_per_course, overall_survey_feedback_str, final_course_outcome_categories # MODIFIED: Return outcomes
 
 
 @SurveyAttemptRouter.post("/start", response_model=SurveyAttemptStartOut)
@@ -284,7 +327,7 @@ async def submit_answers_for_attempt(
                 if not isinstance(answer_val, str): raise ValueError("Answer for input must be a string.")
             elif q_type == AnswerTypeEnum.range:
                 if not isinstance(answer_val, (int, float)): raise ValueError("Answer for range must be a number.")
-                if q_options: # Range validation against min/max defined in question options
+                if q_options: 
                     min_val, max_val = q_options.get("min"), q_options.get("max")
                     if min_val is not None and answer_val < min_val: raise ValueError(f"Value {answer_val} is below minimum {min_val}.")
                     if max_val is not None and answer_val > max_val: raise ValueError(f"Value {answer_val} is above maximum {max_val}.")
@@ -321,7 +364,6 @@ async def submit_survey_attempt(
     survey_collection = get_survey_collection()
     qca_collection = get_qca_collection()
     question_collection = get_question_collection()
-    # course_collection = get_course_collection() # Not directly used in scoring logic here
 
     attempt_obj_id = PyObjectId(attempt_id)
     attempt_dict = await attempt_collection.find_one({"_id": attempt_obj_id, "student_id": current_user.id}) 
@@ -334,9 +376,9 @@ async def submit_survey_attempt(
     survey_dict_from_db = await survey_collection.find_one({"_id": attempt_dict["survey_id"]})
     if not survey_dict_from_db: 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Associated survey not found.")    
-    survey_obj = SurveyInDB.model_validate(survey_dict_from_db) # For accessing typed fields like course_skill_total_score_thresholds
+    survey_obj = SurveyInDB.model_validate(survey_dict_from_db) 
     
-    survey_courses_ids_pyobj = survey_obj.course_ids # These are already PyObjectId from SurveyInDB
+    survey_courses_ids_pyobj = survey_obj.course_ids 
 
     student_answers_for_scoring_cursor = answer_collection.find({"survey_attempt_id": attempt_obj_id})
     answers_list_dicts_with_scores = [] 
@@ -345,9 +387,9 @@ async def submit_survey_attempt(
 
     async for student_answer_dict in student_answers_for_scoring_cursor:
         qca = await qca_collection.find_one({"_id": student_answer_dict["qca_id"]})
-        if not qca: continue # Should not happen if data is consistent
+        if not qca: continue 
         question_dict_from_db = await question_collection.find_one({"_id": qca["question_id"]})
-        if not question_dict_from_db: continue # Should not happen
+        if not question_dict_from_db: continue 
 
         answer_score = await calculate_score_for_answer(question_dict_from_db, student_answer_dict["answer_value"])
         
@@ -359,14 +401,21 @@ async def submit_survey_attempt(
         answers_list_dicts_with_scores.append(student_answer_dict)
         
         course_id_for_qca_str = str(qca["course_id"])
+        
+        # MODIFIED: Apply AnswerAssociationTypeEnum logic
+        answer_score_contribution = answer_score
+        if qca.get("answer_association_type") == AnswerAssociationTypeEnum.negative.value:
+            answer_score_contribution *= -1
+            
         if course_id_for_qca_str in calculated_course_scores:
-            calculated_course_scores[course_id_for_qca_str] += answer_score
-        else: # This case implies a QCA's course_id is not in the survey's course_ids, which is a data inconsistency.
+            calculated_course_scores[course_id_for_qca_str] += answer_score_contribution
+        else: 
             print(f"Warning: QCA {qca['_id']} course {course_id_for_qca_str} not in survey's courses. Score not added to totals.")
     
     attempt_dict["course_scores"] = calculated_course_scores 
 
-    final_course_fb, detailed_fb, overall_survey_fb = await generate_all_feedback_for_attempt(
+    # MODIFIED: Call updated feedback and outcome generation function
+    final_course_fb, detailed_fb, overall_survey_fb, course_outcomes = await generate_all_feedback_and_outcomes_for_attempt(
         attempt_dict, survey_obj, answers_list_dicts_with_scores,
         qca_collection, question_collection
     )
@@ -376,7 +425,8 @@ async def submit_survey_attempt(
         "course_scores": calculated_course_scores,
         "course_feedback": final_course_fb,
         "detailed_feedback": detailed_fb,
-        "overall_survey_feedback": overall_survey_fb
+        "overall_survey_feedback": overall_survey_fb,
+        "course_outcome_categorization": course_outcomes # MODIFIED: Store outcomes
     }
     await attempt_collection.update_one({"_id": attempt_obj_id}, {"$set": update_data_for_attempt})
 
@@ -416,7 +466,6 @@ async def get_survey_attempt_results(
     is_teacher_authorized = False
     if current_user.role == RoleEnum.teacher:
         survey_for_attempt = await survey_collection.find_one({"_id": attempt_dict["survey_id"]})
-        # Teacher who created the survey can view its attempts' results
         if survey_for_attempt and survey_for_attempt["created_by"] == current_user.id:
             is_teacher_authorized = True
 
@@ -458,7 +507,7 @@ async def list_my_survey_attempts(
         prepared_attempt_dict = _prepare_survey_attempt_dict_for_out(attempt_dict_from_db.copy())
         attempt_out = SurveyAttemptOut.model_validate(prepared_attempt_dict)
         
-        if include_answers and attempt_out.is_submitted: # Only include answers if submitted
+        if include_answers and attempt_out.is_submitted: 
             answers_dicts = await answer_collection.find({"survey_attempt_id": PyObjectId(attempt_out.id)}).to_list(length=None)
             prepared_answers_list = []
             for ans_dict in answers_dicts:
@@ -469,11 +518,10 @@ async def list_my_survey_attempts(
         results_out.append(attempt_out)
     return results_out
 
-# NEW ENDPOINT for teachers to get all attempts for a specific survey
 @SurveyAttemptRouter.get("/by-survey/{survey_id}", response_model=List[SurveyAttemptOut])
 async def list_attempts_for_survey(
     survey_id: str,
-    current_user: UserInDB = Depends(require_teacher_role), # Only teachers
+    current_user: UserInDB = Depends(require_teacher_role), 
     skip: int = 0,
     limit: int = 50,
     include_answers: bool = Query(False, description="Set to true to include answers for each attempt")
@@ -490,12 +538,11 @@ async def list_attempts_for_survey(
     if not survey:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found.")
     
-    # Ensure the current teacher is the creator of the survey
     if survey["created_by"] != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view attempts for this survey.")
 
     attempts_cursor = attempt_collection.find(
-        {"survey_id": survey_obj_id, "is_submitted": True} # Typically, teachers are interested in submitted attempts
+        {"survey_id": survey_obj_id, "is_submitted": True} 
     ).skip(skip).limit(limit).sort("submitted_at", -1)
     
     attempts_list_dicts = await attempts_cursor.to_list(length=limit)
@@ -505,7 +552,7 @@ async def list_attempts_for_survey(
         prepared_attempt_dict = _prepare_survey_attempt_dict_for_out(attempt_dict_from_db.copy())
         attempt_out = SurveyAttemptOut.model_validate(prepared_attempt_dict)
         
-        if include_answers: # Answers are only relevant for submitted attempts
+        if include_answers: 
             answers_dicts = await answer_collection.find({"survey_attempt_id": PyObjectId(attempt_out.id)}).to_list(length=None)
             prepared_answers_list = []
             for ans_dict in answers_dicts:

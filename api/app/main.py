@@ -1,4 +1,3 @@
-# FilePath: api/app/main.py
 import uvicorn
 from fastapi import FastAPI, APIRouter
 from contextlib import asynccontextmanager

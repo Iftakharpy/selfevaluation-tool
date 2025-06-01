@@ -1,4 +1,3 @@
-# FilePath: api/app/qca/data_types.py
 from __future__ import annotations
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Annotated, List

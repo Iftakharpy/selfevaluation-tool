@@ -1,5 +1,3 @@
-# FilePath: api/app/users/auth.py
-# users/auth.py
 from fastapi import Depends, HTTPException, status, Request
 from passlib.context import CryptContext
 from typing import Optional

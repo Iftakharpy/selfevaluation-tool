@@ -1,9 +1,9 @@
 - [Project info](#project-info)
-	- [Frontend pages](#frontend-pages)
-	- [Production environment setup guide](#production-environment-setup-guide)
-	- [Development environment setup guide](#development-environment-setup-guide)
-		- [FastAPI backend](#fastapi-backend)
-		- [React Frontend](#react-frontend)
+  - [Frontend pages](#frontend-pages)
+  - [Production environment setup guide](#production-environment-setup-guide)
+  - [Development environment setup guide](#development-environment-setup-guide)
+    - [FastAPI backend](#fastapi-backend)
+    - [React Frontend](#react-frontend)
 
 
 # Project info
@@ -62,8 +62,8 @@ Steps to run the server:
 ### FastAPI backend
 
 1. Install anaconda/pyenv/venv to manage python environment
-3. `conda create -n aida python=3.13.1` creates conda environment for the project
-4. `conda activate aida` activates the created environment
+3. `conda create -n env_api python=3.13.3` creates conda environment for the project
+4. `conda activate env_api` activates the created environment
 5. Before running the following steps the `working directory` or `pwd` should be `./api`.
 6. `pip install -r requirements.txt` instals the required packages for the project
 7. `fastapi dev` runs the API and reloads the server when files changes in the app directory

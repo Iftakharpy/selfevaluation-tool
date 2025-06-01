@@ -1,5 +1,3 @@
-# FilePath: C:\Users\iftak\Desktop\jamk\2025 Spring\narsus-self-evaluation-tool\api\app\questions\router.py
-# FilePath: api/app/questions/router.py
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 from bson import ObjectId
