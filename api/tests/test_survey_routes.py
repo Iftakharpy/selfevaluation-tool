@@ -1,5 +1,4 @@
 # FilePath: C:\Users\iftak\Desktop\jamk\2025 Spring\narsus-self-evaluation-tool\api\tests\test_survey_routes.py
-# FilePath: api/tests/test_survey_routes.py
 from fastapi.testclient import TestClient
 from http import HTTPStatus
 import uuid 
@@ -38,10 +37,10 @@ def create_sample_qca_for_survey_test(client: TestClient, q_id: str, c_id: str):
     assert qca_res.status_code == HTTPStatus.CREATED
     return qca_res.json()
 
-def create_sample_survey_for_test(client: TestClient, course_ids: list, title_suffix: str, published: bool = True):
+def create_sample_survey_for_test(client: TestClient, course_ids: list, full_title: str, published: bool = True): # MODIFIED: Renamed title_suffix to full_title
     # This client MUST be authenticated as a teacher
     survey_payload = {
-        "title": f"SurveyTest {title_suffix}",
+        "title": full_title, # MODIFIED: Use full_title directly
         "description": "Test survey description.",
         "course_ids": course_ids,
         "is_published": published
@@ -92,30 +91,50 @@ def test_create_survey_fail_as_student(
     authenticated_teacher_data_and_client: tuple[TestClient, dict], 
     authenticated_student_data_and_client: tuple[TestClient, dict]
 ):
-    teacher_client, teacher_details = authenticated_teacher_data_and_client
-    course1 = create_sample_course_for_survey_test(teacher_client, uuid.uuid4().hex[:4]) 
+    client, teacher_details = authenticated_teacher_data_and_client
+    _, student_details = authenticated_student_data_and_client
 
-    student_client, student_details = authenticated_student_data_and_client
+    # --- Teacher's turn to create a course ---
+    teacher_login_payload = {"username": teacher_details["username"], "password": "testpassword"}
+    login_res_teacher = client.post("/api/v1/users/login", json=teacher_login_payload)
+    assert login_res_teacher.status_code == HTTPStatus.OK, f"Teacher login failed: {login_res_teacher.text}"
+    course1 = create_sample_course_for_survey_test(client, uuid.uuid4().hex[:4]) 
+
+    # --- Student's turn to try creating a survey ---
+    student_login_payload = {"username": student_details["username"], "password": "testpassword"}
+    login_res_student = client.post("/api/v1/users/login", json=student_login_payload)
+    assert login_res_student.status_code == HTTPStatus.OK, f"Student login failed: {login_res_student.text}"
     
     survey_payload = {"title": "Student Survey Attempt", "course_ids": [course1["id"]], "is_published": False}
-    response = student_client.post("/api/v1/surveys/", json=survey_payload) 
+    response = client.post("/api/v1/surveys/", json=survey_payload) 
     assert response.status_code == HTTPStatus.FORBIDDEN
 
 def test_list_surveys_student_sees_only_published(
     authenticated_teacher_data_and_client: tuple[TestClient, dict],
     authenticated_student_data_and_client: tuple[TestClient, dict]
 ):
-    teacher_client, teacher_details = authenticated_teacher_data_and_client
-    course1 = create_sample_course_for_survey_test(teacher_client, uuid.uuid4().hex[:4]) 
+    client, teacher_details = authenticated_teacher_data_and_client
+    _, student_details = authenticated_student_data_and_client
+
+    # --- Teacher's turn to set up surveys ---
+    teacher_login_payload = {"username": teacher_details["username"], "password": "testpassword"}
+    login_res_teacher = client.post("/api/v1/users/login", json=teacher_login_payload)
+    assert login_res_teacher.status_code == HTTPStatus.OK, f"Teacher login failed: {login_res_teacher.text}"
+
+    course1 = create_sample_course_for_survey_test(client, uuid.uuid4().hex[:4]) 
     
     pub_title = f"Published Test Survey {uuid.uuid4().hex[:4]}"
     draft_title = f"Draft Test Survey {uuid.uuid4().hex[:4]}"
     
-    create_sample_survey_for_test(teacher_client, [course1["id"]], pub_title, published=True) 
-    create_sample_survey_for_test(teacher_client, [course1["id"]], draft_title, published=False) 
+    create_sample_survey_for_test(client, [course1["id"]], pub_title, published=True) 
+    create_sample_survey_for_test(client, [course1["id"]], draft_title, published=False) 
     
-    student_client, student_details = authenticated_student_data_and_client
-    response = student_client.get("/api/v1/surveys/") 
+    # --- Student's turn to view surveys ---
+    student_login_payload = {"username": student_details["username"], "password": "testpassword"}
+    login_res_student = client.post("/api/v1/users/login", json=student_login_payload)
+    assert login_res_student.status_code == HTTPStatus.OK, f"Student login failed: {login_res_student.text}"
+
+    response = client.get("/api/v1/surveys/") 
     assert response.status_code == HTTPStatus.OK
     data = response.json()
     assert any(s["title"] == pub_title and s["is_published"] for s in data)
@@ -127,7 +146,7 @@ def test_get_survey_with_questions(authenticated_teacher_data_and_client: tuple[
     question = create_sample_question_for_survey_test(teacher_client, f"Q_Svy_{uuid.uuid4().hex[:4]}")
     create_sample_qca_for_survey_test(teacher_client, question["id"], course["id"])
     
-    survey = create_sample_survey_for_test(teacher_client, [course["id"]], "SvyWithQs", published=True)
+    survey = create_sample_survey_for_test(teacher_client, [course["id"]], "SvyWithQs", published=True) # Uses full_title
     
     response = teacher_client.get(f"/api/v1/surveys/{survey['id']}?include_questions=true")
     assert response.status_code == HTTPStatus.OK
@@ -139,20 +158,30 @@ def test_get_unpublished_survey_by_id_fail_student(
     authenticated_teacher_data_and_client: tuple[TestClient, dict],
     authenticated_student_data_and_client: tuple[TestClient, dict]
 ):
-    teacher_client, teacher_details = authenticated_teacher_data_and_client
-    course1 = create_sample_course_for_survey_test(teacher_client, uuid.uuid4().hex[:4]) 
-    survey = create_sample_survey_for_test(teacher_client, [course1["id"]], "UnpubSvy", published=False) 
+    client, teacher_details = authenticated_teacher_data_and_client
+    _, student_details = authenticated_student_data_and_client
+
+    # --- Teacher's turn to set up ---
+    teacher_login_payload = {"username": teacher_details["username"], "password": "testpassword"}
+    login_res_teacher = client.post("/api/v1/users/login", json=teacher_login_payload)
+    assert login_res_teacher.status_code == HTTPStatus.OK, f"Teacher login failed: {login_res_teacher.text}"
+    
+    course1 = create_sample_course_for_survey_test(client, uuid.uuid4().hex[:4]) 
+    survey = create_sample_survey_for_test(client, [course1["id"]], "UnpubSvy", published=False) # Uses full_title
     survey_id = survey["id"]
 
-    student_client, student_details = authenticated_student_data_and_client
+    # --- Student's turn to attempt access ---
+    student_login_payload = {"username": student_details["username"], "password": "testpassword"}
+    login_res_student = client.post("/api/v1/users/login", json=student_login_payload)
+    assert login_res_student.status_code == HTTPStatus.OK, f"Student login failed: {login_res_student.text}"
     
-    response = student_client.get(f"/api/v1/surveys/{survey_id}") 
+    response = client.get(f"/api/v1/surveys/{survey_id}") 
     assert response.status_code == HTTPStatus.FORBIDDEN
 
 def test_update_survey_success_as_owner_teacher(authenticated_teacher_data_and_client: tuple[TestClient, dict]):
     teacher_client, teacher_info = authenticated_teacher_data_and_client 
     course1 = create_sample_course_for_survey_test(teacher_client, uuid.uuid4().hex[:4]) 
-    survey = create_sample_survey_for_test(teacher_client, [course1["id"]], "OrigTitle", published=False)
+    survey = create_sample_survey_for_test(teacher_client, [course1["id"]], "OrigTitle", published=False) # Uses full_title
     survey_id = survey["id"]
 
     update_payload = {"title": "Updated Title By Owner", "is_published": True}
@@ -165,7 +194,7 @@ def test_update_survey_success_as_owner_teacher(authenticated_teacher_data_and_c
 def test_delete_survey_success_as_owner_teacher(authenticated_teacher_data_and_client: tuple[TestClient, dict]):
     teacher_client, _ = authenticated_teacher_data_and_client 
     course1 = create_sample_course_for_survey_test(teacher_client, uuid.uuid4().hex[:4]) 
-    survey = create_sample_survey_for_test(teacher_client, [course1["id"]], "ToDelete")
+    survey = create_sample_survey_for_test(teacher_client, [course1["id"]], "ToDelete") # Uses full_title
     survey_id = survey["id"]
 
     delete_response = teacher_client.delete(f"/api/v1/surveys/{survey_id}") 
@@ -178,21 +207,35 @@ def test_delete_survey_fails_if_has_submitted_attempts(
     authenticated_teacher_data_and_client: tuple[TestClient, dict],
     authenticated_student_data_and_client: tuple[TestClient, dict]
 ):
-    teacher_client, teacher_details = authenticated_teacher_data_and_client
-    course = create_sample_course_for_survey_test(teacher_client, "DelPrevCrsSvy") 
-    survey = create_sample_survey_for_test(teacher_client, [course["id"]], "DelPrevSvy", published=True) 
+    client, teacher_details = authenticated_teacher_data_and_client
+    _, student_details = authenticated_student_data_and_client
+
+    # --- Teacher's turn to set up ---
+    teacher_login_payload = {"username": teacher_details["username"], "password": "testpassword"}
+    login_res_teacher = client.post("/api/v1/users/login", json=teacher_login_payload)
+    assert login_res_teacher.status_code == HTTPStatus.OK, f"Teacher login failed: {login_res_teacher.text}"
+
+    course = create_sample_course_for_survey_test(client, "DelPrevCrsSvy") 
+    survey = create_sample_survey_for_test(client, [course["id"]], "DelPrevSvy", published=True) # Uses full_title
     survey_id = survey["id"]
 
-    student_client, student_details = authenticated_student_data_and_client
-    attempt_data = create_survey_attempt_for_test(student_client, survey_id) 
-    attempt_id = attempt_data["attempt_id"]
-    submit_survey_attempt_for_test(student_client, attempt_id) 
+    # --- Student's turn to take survey ---
+    student_login_payload = {"username": student_details["username"], "password": "testpassword"}
+    login_res_student = client.post("/api/v1/users/login", json=student_login_payload)
+    assert login_res_student.status_code == HTTPStatus.OK, f"Student login failed: {login_res_student.text}"
 
-    # Teacher attempts to delete the survey using teacher_client
-    delete_response = teacher_client.delete(f"/api/v1/surveys/{survey_id}")
+    attempt_data = create_survey_attempt_for_test(client, survey_id) 
+    attempt_id = attempt_data["attempt_id"]
+    submit_survey_attempt_for_test(client, attempt_id) 
+
+    # --- Teacher's turn to attempt deletion ---
+    login_res_teacher_again = client.post("/api/v1/users/login", json=teacher_login_payload)
+    assert login_res_teacher_again.status_code == HTTPStatus.OK, f"Teacher re-login failed: {login_res_teacher_again.text}"
+
+    delete_response = client.delete(f"/api/v1/surveys/{survey_id}")
     assert delete_response.status_code == HTTPStatus.BAD_REQUEST
     assert "Cannot delete survey with submitted attempts" in delete_response.json()["detail"]
 
-    # Verify survey still exists using teacher_client
-    get_res = teacher_client.get(f"/api/v1/surveys/{survey_id}")
+    # Verify survey still exists
+    get_res = client.get(f"/api/v1/surveys/{survey_id}")
     assert get_res.status_code == HTTPStatus.OK

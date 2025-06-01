@@ -156,15 +156,26 @@ def test_update_course_fail_as_student(
     authenticated_teacher_data_and_client: tuple[TestClient, dict], 
     authenticated_student_data_and_client: tuple[TestClient, dict]
 ):
-    teacher_client, _ = authenticated_teacher_data_and_client
+    client, teacher_details = authenticated_teacher_data_and_client
+    _, student_details = authenticated_student_data_and_client
+
+    # --- Teacher's turn ---
+    teacher_login_payload = {"username": teacher_details["username"], "password": "testpassword"}
+    login_res_teacher = client.post("/api/v1/users/login", json=teacher_login_payload)
+    assert login_res_teacher.status_code == HTTPStatus.OK, f"Teacher login failed: {login_res_teacher.text}"
+
     course_payload = create_unique_course_payload(course_template_1)
-    create_response = teacher_client.post("/api/v1/courses/", json=course_payload)
-    assert create_response.status_code == HTTPStatus.CREATED
+    create_response = client.post("/api/v1/courses/", json=course_payload)
+    assert create_response.status_code == HTTPStatus.CREATED, f"Course creation by teacher failed: {create_response.text}"
     course_id = create_response.json()["id"]
 
-    student_client, _ = authenticated_student_data_and_client
+    # --- Student's turn ---
+    student_login_payload = {"username": student_details["username"], "password": "testpassword"}
+    login_res_student = client.post("/api/v1/users/login", json=student_login_payload)
+    assert login_res_student.status_code == HTTPStatus.OK, f"Student login failed: {login_res_student.text}"
+
     update_payload = {"name": "Student Attempt Update"}
-    response = student_client.put(f"/api/v1/courses/{course_id}", json=update_payload)
+    response = client.put(f"/api/v1/courses/{course_id}", json=update_payload)
     assert response.status_code == HTTPStatus.FORBIDDEN
 
 def test_update_course_not_found(authenticated_teacher_data_and_client: tuple[TestClient, dict]):
@@ -199,14 +210,25 @@ def test_delete_course_fail_as_student(
     authenticated_teacher_data_and_client: tuple[TestClient, dict], 
     authenticated_student_data_and_client: tuple[TestClient, dict]
 ):
-    teacher_client, _ = authenticated_teacher_data_and_client
+    client, teacher_details = authenticated_teacher_data_and_client
+    _, student_details = authenticated_student_data_and_client
+
+    # --- Teacher's turn ---
+    teacher_login_payload = {"username": teacher_details["username"], "password": "testpassword"}
+    login_res_teacher = client.post("/api/v1/users/login", json=teacher_login_payload)
+    assert login_res_teacher.status_code == HTTPStatus.OK, f"Teacher login failed: {login_res_teacher.text}"
+
     course_payload = create_unique_course_payload(course_template_1)
-    create_response = teacher_client.post("/api/v1/courses/", json=course_payload)
-    assert create_response.status_code == HTTPStatus.CREATED
+    create_response = client.post("/api/v1/courses/", json=course_payload)
+    assert create_response.status_code == HTTPStatus.CREATED, f"Course creation by teacher failed: {create_response.text}"
     course_id = create_response.json()["id"]
 
-    student_client, _ = authenticated_student_data_and_client
-    response = student_client.delete(f"/api/v1/courses/{course_id}")
+    # --- Student's turn ---
+    student_login_payload = {"username": student_details["username"], "password": "testpassword"}
+    login_res_student = client.post("/api/v1/users/login", json=student_login_payload)
+    assert login_res_student.status_code == HTTPStatus.OK, f"Student login failed: {login_res_student.text}"
+    
+    response = client.delete(f"/api/v1/courses/{course_id}")
     assert response.status_code == HTTPStatus.FORBIDDEN
 
 def test_delete_course_not_found(authenticated_teacher_data_and_client: tuple[TestClient, dict]):
