@@ -69,3 +69,18 @@ def get_qca_collection():
     if MONGO_DB.db is None:
         raise Exception("Database not initialized. Call connect_to_mongo first.")
     return MONGO_DB.db["question_course_associations"]
+
+def get_survey_collection():
+    if MONGO_DB.db is None:
+        raise Exception("Database not initialized. Call connect_to_mongo first.")
+    return MONGO_DB.db["surveys"]
+
+def get_survey_attempt_collection():
+    if MONGO_DB.db is None:
+        raise Exception("Database not initialized. Call connect_to_mongo first.")
+    return MONGO_DB.db["survey_attempts"]
+
+def get_student_answer_collection():
+    if MONGO_DB.db is None:
+        raise Exception("Database not initialized. Call connect_to_mongo first.")
+    return MONGO_DB.db["student_answers"]

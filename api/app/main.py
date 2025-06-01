@@ -14,6 +14,8 @@ from .users.router import UserRouter
 from .courses.router import CourseRouter
 from .questions.router import QuestionRouter
 from .qca.router import QcaRouter
+from .surveys.router import SurveyRouter 
+from .survey_attempts.router import SurveyAttemptRouter
 
 
 
@@ -53,6 +55,8 @@ api_root.include_router(UserRouter, prefix="/users", tags=["User"])
 api_root.include_router(CourseRouter, prefix="/courses", tags=["Courses"])
 api_root.include_router(QuestionRouter, prefix="/questions", tags=["Questions"])
 api_root.include_router(QcaRouter, prefix="/question-course-associations", tags=["Question-Course Associations"])
+api_root.include_router(SurveyRouter, prefix="/surveys", tags=["Surveys"]) 
+api_root.include_router(SurveyAttemptRouter, prefix="/survey-attempts", tags=["Survey Attempts"])
 
 app.include_router(api_root)
 

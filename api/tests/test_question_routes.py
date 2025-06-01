@@ -1,9 +1,11 @@
+# FilePath: C:\Users\iftak\Desktop\jamk\2025 Spring\narsus-self-evaluation-tool\api\tests\test_question_routes.py
 # FilePath: api/tests/test_question_routes.py
 from fastapi.testclient import TestClient
 from http import HTTPStatus
 import uuid 
 
 from app.questions.data_types import AnswerTypeEnum
+from app.courses.data_types import CourseCreate # For creating courses for QCA test
 
 # --- Test Data Templates ---
 def create_base_question_payload(answer_type: AnswerTypeEnum, unique_suffix: str = ""):
@@ -33,6 +35,28 @@ def create_base_question_payload(answer_type: AnswerTypeEnum, unique_suffix: str
         payload["scoring_rules"] = {"target_value": 7, "score_at_target": 10, "score_per_deviation_unit": -1}
     return payload
 
+# Helper to create a course for testing QCA cascade
+def create_test_course_for_question_test(client: TestClient, suffix: str) -> dict:
+    course_payload = {
+        "name": f"Test Course QDT {suffix}", # Shortened name
+        "code": f"CRSQD_{suffix}", # Shortened code CRS_Q_DEL_ -> CRSQD_ (10 + 6 = 16 chars) - OK
+        "description": "A test course."
+    }
+    response = client.post("/api/v1/courses/", json=course_payload)
+    assert response.status_code == HTTPStatus.CREATED, f"Failed to create test course: {response.text}"
+    return response.json()
+
+# Helper to create a QCA
+def create_test_qca_for_question_test(client: TestClient, question_id: str, course_id: str) -> dict:
+    qca_payload = {
+        "question_id": question_id,
+        "course_id": course_id,
+    }
+    response = client.post("/api/v1/question-course-associations/", json=qca_payload)
+    assert response.status_code == HTTPStatus.CREATED, f"Failed to create QCA: {response.text}"
+    return response.json()
+
+
 def test_create_question_success_as_teacher(authenticated_teacher_data_and_client: tuple[TestClient, dict]):
     client, _ = authenticated_teacher_data_and_client
     unique_suffix = uuid.uuid4().hex[:6]
@@ -55,14 +79,14 @@ def test_create_question_fail_as_student(authenticated_student_data_and_client: 
     response = client.post("/api/v1/questions/", json=question_payload)
     assert response.status_code == HTTPStatus.FORBIDDEN
 
-def test_create_question_fail_unauthenticated(client: TestClient): # Uses function-scoped client
+def test_create_question_fail_unauthenticated(client: TestClient): 
     question_payload = create_base_question_payload(AnswerTypeEnum.range)
     response = client.post("/api/v1/questions/", json=question_payload)
     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 def test_create_question_invalid_payload(authenticated_teacher_data_and_client: tuple[TestClient, dict]):
     client, _ = authenticated_teacher_data_and_client
-    invalid_payload = {"title": "Sh", "answer_type": "invalid_type"} # title too short, invalid enum
+    invalid_payload = {"title": "Sh", "answer_type": "invalid_type"} 
     response = client.post("/api/v1/questions/", json=invalid_payload)
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY 
 
@@ -119,34 +143,20 @@ def test_get_question_invalid_id_format(authenticated_teacher_data_and_client: t
 # --- Update Question Tests ---
 def test_update_question_success(authenticated_teacher_data_and_client: tuple[TestClient, dict]):
     client, teacher_details = authenticated_teacher_data_and_client
-    print(f"\n--- test_update_question_success: Client cookies at start: {client.cookies.items()} ---")
-    print(f"--- Authenticated as: {teacher_details['username']} ---")
             
     unique_suffix_create = uuid.uuid4().hex[:6]
     original_payload = create_base_question_payload(AnswerTypeEnum.multiple_select, unique_suffix_create)
     
     create_response = client.post("/api/v1/questions/", json=original_payload)
-    assert create_response.status_code == HTTPStatus.CREATED, f"Create failed: {create_response.text} - Cookies: {client.cookies.items()}"
+    assert create_response.status_code == HTTPStatus.CREATED, f"Create failed: {create_response.text}"
     question_id = create_response.json()["id"]
 
     unique_suffix_update = uuid.uuid4().hex[:4]
     update_data_payload = {"title": f"Updated Title {unique_suffix_update}", "details": "Updated details."}
     
-    print(f"--- test_update_question_success: Client cookies before PUT: {client.cookies.items()} ---")
     response = client.put(f"/api/v1/questions/{question_id}", json=update_data_payload)
     
-    if response.status_code != HTTPStatus.OK:
-        print(f"\nDEBUG: test_update_question_success - PUT request failed for question ID {question_id}")
-        print(f"Status Code: {response.status_code}")
-        try:
-            print(f"Response JSON: {response.json()}")
-        except Exception:
-            print(f"Response Text: {response.text}")
-        print("Request Payload Sent for PUT:")
-        print(update_data_payload)
-        print(f"--- test_update_question_success: Client cookies after failed PUT: {client.cookies.items()} ---")
-
-    assert response.status_code == HTTPStatus.OK
+    assert response.status_code == HTTPStatus.OK, response.text
     
     data = response.json()
     assert data["id"] == question_id
@@ -206,3 +216,34 @@ def test_delete_question_not_found(authenticated_teacher_data_and_client: tuple[
     non_existent_id = "60c72b2f9b1e8b001c8e4d00"
     response = client.delete(f"/api/v1/questions/{non_existent_id}")
     assert response.status_code == HTTPStatus.NOT_FOUND
+
+# --- NEW TEST FOR QCA CASCADE ---
+def test_delete_question_cascades_to_qca(authenticated_teacher_data_and_client: tuple[TestClient, dict]):
+    client, _ = authenticated_teacher_data_and_client # client is authed as teacher
+
+    # 1. Create a course and a question
+    course = create_test_course_for_question_test(client, "CFCasc") # client is teacher
+    assert course is not None
+    course_id = course["id"]
+
+    question_payload = create_base_question_payload(AnswerTypeEnum.input, uuid.uuid4().hex[:6])
+    question_res = client.post("/api/v1/questions/", json=question_payload) # client is teacher
+    assert question_res.status_code == HTTPStatus.CREATED
+    question_id = question_res.json()["id"]
+    
+    # 2. Create a QCA linking them
+    qca = create_test_qca_for_question_test(client, question_id, course_id) # client is teacher
+    assert qca is not None
+    qca_id = qca["id"]
+
+    # 3. Verify QCA exists
+    get_qca_res = client.get(f"/api/v1/question-course-associations/{qca_id}") # client is teacher
+    assert get_qca_res.status_code == HTTPStatus.OK
+
+    # 4. Delete the question
+    delete_question_res = client.delete(f"/api/v1/questions/{question_id}") # client is teacher
+    assert delete_question_res.status_code == HTTPStatus.NO_CONTENT
+
+    # 5. Verify QCA is deleted
+    get_qca_after_delete_res = client.get(f"/api/v1/question-course-associations/{qca_id}") # client is teacher
+    assert get_qca_after_delete_res.status_code == HTTPStatus.NOT_FOUND
