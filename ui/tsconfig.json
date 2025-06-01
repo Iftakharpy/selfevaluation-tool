@@ -1,0 +1,11 @@
+{
+  "files": [],
+  // make sure any type don't throw lint errors
+  "compilerOptions": {
+    "noImplicitAny": false
+  },
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

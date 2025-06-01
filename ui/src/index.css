@@ -1,0 +1,19 @@
+@import "tailwindcss";
+/* This is the new way for v4 with the Vite plugin */
+
+/* Or, if the above doesn't work out of the box with v4.1 specific Vite plugin behavior,
+       the traditional layers (ensure your plugin/Vite handles PostCSS processing):
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+    */
+
+/* Your global base styles can go here */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
