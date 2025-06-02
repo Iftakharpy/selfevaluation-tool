@@ -126,6 +126,7 @@ const CoursesPage: React.FC = () => {
 
       <Modal
         isOpen={isModalOpen}
+        size='3xl'
         onClose={handleCloseModal}
         title={selectedCourse ? 'Edit Course' : 'Create New Course'}
       >

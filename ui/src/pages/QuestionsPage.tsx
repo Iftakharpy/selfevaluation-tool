@@ -236,7 +236,7 @@ const QuestionsPage: React.FC = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editingQuestion?.id ? 'Edit Question' : 'Create New Question'}
-        size="3xl" 
+        size="4xl"
         // The QuestionForm has its own overflow-y-auto and max-height
         // so the modal's content area doesn't need explicit overflow handling here.
         // We can pass a class to style the modal body if needed for padding, etc.

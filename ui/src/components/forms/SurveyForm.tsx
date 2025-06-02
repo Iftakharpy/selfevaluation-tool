@@ -266,9 +266,9 @@ const SurveyForm: React.FC<SurveyFormProps> = ({
                   {(feedbackThresholds[courseId] || []).map((fbRule, ruleIdx) => (
                     <div key={`fb-${courseId}-${ruleIdx}`} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-end p-2 border rounded bg-white my-1">
                       <Input error={errors[`fb_score_${courseId}_${ruleIdx}`]} label="Score" type="number" step="any" value={fbRule.score_value} onChange={e => updateFeedbackRule(courseId, ruleIdx, 'score_value', e.target.value)} containerClassName="mb-0 col-span-2 md:col-span-1" labelClassName="text-xs" disabled={isSubmitting}/>
-                      <Select label="Compare" options={comparisonOptions} value={fbRule.comparison} onChange={e => updateFeedbackRule(courseId, ruleIdx, 'comparison', e.target.value)} containerClassName="mb-0 col-span-2 md:col-span-1" labelClassName="text-xs" disabled={isSubmitting}/>
+                      <Select label="Compare" options={comparisonOptions} value={fbRule.comparison} onChange={e => updateFeedbackRule(courseId, ruleIdx, 'comparison', e.target.value)} containerClassName="mb-0 col-span-3 md:col-span-2" labelClassName="text-xs" disabled={isSubmitting}/>
                       <Textarea error={errors[`fb_text_${courseId}_${ruleIdx}`]} label="Feedback Text" value={fbRule.feedback} onChange={e => updateFeedbackRule(courseId, ruleIdx, 'feedback', e.target.value)} rows={1} containerClassName="mb-0 col-span-5 md:col-span-3" labelClassName="text-xs" disabled={isSubmitting}/>
-                      <Button type="button" variant="danger" size="xs" onClick={() => removeFeedbackRule(courseId, ruleIdx)} className="col-span-1 self-center mb-0 md:mt-4" disabled={isSubmitting}>Del</Button>
+                      <Button type="button" variant="danger" size="md" onClick={() => removeFeedbackRule(courseId, ruleIdx)} className="col-span-1 self-center mb-0 md:mt-4" disabled={isSubmitting}>Del</Button>
                     </div>
                   ))}
                   <Button type="button" variant="ghost" size="xs" onClick={() => addFeedbackRule(courseId)} className="mt-1" disabled={isSubmitting}>+ Add Feedback Rule</Button>
@@ -280,9 +280,9 @@ const SurveyForm: React.FC<SurveyFormProps> = ({
                   {(outcomeThresholds[courseId] || []).map((outRule, ruleIdx) => (
                     <div key={`out-${courseId}-${ruleIdx}`} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-end p-2 border rounded bg-white my-1">
                        <Input error={errors[`out_score_${courseId}_${ruleIdx}`]} label="Score" type="number" step="any" value={outRule.score_value} onChange={e => updateOutcomeRule(courseId, ruleIdx, 'score_value', e.target.value)} containerClassName="mb-0 col-span-2 md:col-span-1" labelClassName="text-xs" disabled={isSubmitting}/>
-                       <Select label="Compare" options={comparisonOptions} value={outRule.comparison} onChange={e => updateOutcomeRule(courseId, ruleIdx, 'comparison', e.target.value)} containerClassName="mb-0 col-span-2 md:col-span-1" labelClassName="text-xs" disabled={isSubmitting}/>
+                       <Select label="Compare" options={comparisonOptions} value={outRule.comparison} onChange={e => updateOutcomeRule(courseId, ruleIdx, 'comparison', e.target.value)} containerClassName="mb-0 col-span-3 md:col-span-2" labelClassName="text-xs" disabled={isSubmitting}/>
                        <Select label="Outcome" options={outcomeCategoryOptions} value={outRule.outcome} onChange={e => updateOutcomeRule(courseId, ruleIdx, 'outcome', e.target.value)} containerClassName="mb-0 col-span-5 md:col-span-3" labelClassName="text-xs" disabled={isSubmitting}/>
-                      <Button type="button" variant="danger" size="xs" onClick={() => removeOutcomeRule(courseId, ruleIdx)} className="col-span-1 self-center mb-0 md:mt-4" disabled={isSubmitting}>Del</Button>
+                      <Button type="button" variant="danger" size="md" onClick={() => removeOutcomeRule(courseId, ruleIdx)} className="col-span-1 self-center mb-0 md:mt-4" disabled={isSubmitting}>Del</Button>
                     </div>
                   ))}
                   <Button type="button" variant="ghost" size="xs" onClick={() => addOutcomeRule(courseId)} className="mt-1" disabled={isSubmitting}>+ Add Outcome Rule</Button>

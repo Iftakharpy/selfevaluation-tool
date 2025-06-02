@@ -212,6 +212,7 @@ const SurveyManagementPage: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
+        size="4xl"
         title={editingSurvey ? 'Edit Survey' : 'Create New Survey'}
       >
         {isModalLoading && <div className="text-center p-4">Loading survey data...</div>}
