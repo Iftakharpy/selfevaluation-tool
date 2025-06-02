@@ -13,6 +13,7 @@ MONGO_DB = DataBase()
 
 DATABASE_NAME = "survey_db"
 MONGO_DATABASE_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+# MONGO_DATABASE_URL = os.getenv("MONGO_URL", "mongodb://mongodb_container:27017")
 
 
 SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "your-super-secret-key-for-sessions-CHANGE-ME") # IMPORTANT: Change this in prod!

@@ -14,12 +14,13 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage'; 
 import TeacherDashboardPage from './pages/TeacherDashboardPage';
 import SurveyListPage from './pages/SurveyListPage';
-import TakeSurveyPage from './pages/TakeSurveyPage';      
-import MyAttemptsPage from './pages/MyAttemptsPage';      
+import TakeSurveyPage from './pages/TakeSurveyPage';
+import MyAttemptsPage from './pages/MyAttemptsPage';
 import SurveyResultsPage from './pages/SurveyResultsPage';
+import CoursesPage from './pages/CoursesPage';      // NEW
+import QuestionsPage from './pages/QuestionsPage';  // NEW
 // Import other page components as you create them
-// import CoursesPage from './pages/CoursesPage';
-// import QuestionsPage from './pages/QuestionsPage';
+// import SurveyManagementPage from './pages/SurveyManagementPage';
 
 
 function App() {
@@ -39,69 +40,48 @@ function App() {
       <Route path="/signup" element={<SignupPage />} />
       
       <Route element={<MainLayout />}>
+        {/* Common Routes */}
         <Route 
           path="/" 
-          element={
-            <ProtectedRoute>
-              <HomePage />
-            </ProtectedRoute>
-          } 
+          element={<ProtectedRoute><HomePage /></ProtectedRoute>} 
         />
         <Route 
           path="/surveys" 
-          element={
-            <ProtectedRoute>
-              <SurveyListPage />
-            </ProtectedRoute>
-          } 
+          element={<ProtectedRoute><SurveyListPage /></ProtectedRoute>} 
         />
+        
+        {/* Student Routes */}
         <Route 
           path="/my-attempts" 
-          element={
-            <ProtectedRoute allowedRoles={['student']}>
-              <MyAttemptsPage />
-            </ProtectedRoute>
-          } 
+          element={<ProtectedRoute allowedRoles={['student']}><MyAttemptsPage /></ProtectedRoute>} 
         />
         <Route 
           path="/survey/take/:surveyId" 
-          element={
-            <ProtectedRoute allowedRoles={['student']}>
-              <TakeSurveyPage />
-            </ProtectedRoute>
-          } 
+          element={<ProtectedRoute allowedRoles={['student']}><TakeSurveyPage /></ProtectedRoute>} 
         />
         <Route 
           path="/results/:attemptId" 
-          element={
-            <ProtectedRoute>
-              <SurveyResultsPage />
-            </ProtectedRoute>
-          } 
+          element={<ProtectedRoute><SurveyResultsPage /></ProtectedRoute>} 
         />
         
         {/* Teacher-specific routes */}
         <Route 
           path="/dashboard" 
-          element={
-            <ProtectedRoute allowedRoles={['teacher']}>
-              <TeacherDashboardPage />
-            </ProtectedRoute>
-          } 
-        />
-        {/* <Route 
-          path="/courses" 
-          element={
-            <ProtectedRoute allowedRoles={['teacher']}>
-              <CoursesPage />
-            </ProtectedRoute>
-          } 
+          element={<ProtectedRoute allowedRoles={['teacher']}><TeacherDashboardPage /></ProtectedRoute>} 
         />
         <Route 
-          path="/questions" 
+          path="/courses/manage" // Changed path for clarity
+          element={<ProtectedRoute allowedRoles={['teacher']}><CoursesPage /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/questions/manage" // Changed path for clarity
+          element={<ProtectedRoute allowedRoles={['teacher']}><QuestionsPage /></ProtectedRoute>} 
+        />
+        {/* <Route 
+          path="/surveys/manage" 
           element={
             <ProtectedRoute allowedRoles={['teacher']}>
-              <QuestionsPage />
+              <SurveyManagementPage />
             </ProtectedRoute>
           } 
         /> */}

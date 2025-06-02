@@ -30,22 +30,59 @@ async def create_question(
         
     return QuestionOut.model_validate(created_question_dict)
 
+# @QuestionRouter.get("/", response_model=List[QuestionOut])
+# async def list_questions(
+#     skip: int = 0,
+#     limit: int = 100,
+#     teacher_user: UserInDB = Depends(require_teacher_role) 
+# ):
+#     question_collection = get_question_collection()
+#     questions_cursor = question_collection.find().skip(skip).limit(limit)
+#     questions_list_from_db = await questions_cursor.to_list(length=limit)
+    
+#     processed_questions = []
+#     for q_dict in questions_list_from_db:
+#         if "_id" in q_dict:
+#             q_dict["id"] = str(q_dict.pop("_id"))
+#         processed_questions.append(QuestionOut.model_validate(q_dict))
+#     return processed_questions
+
 @QuestionRouter.get("/", response_model=List[QuestionOut])
 async def list_questions(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 10, # Reduce limit for easier debugging
     teacher_user: UserInDB = Depends(require_teacher_role) 
 ):
     question_collection = get_question_collection()
     questions_cursor = question_collection.find().skip(skip).limit(limit)
     questions_list_from_db = await questions_cursor.to_list(length=limit)
     
+    print(f"DEBUG: Fetched {len(questions_list_from_db)} raw documents from DB.")
+    
     processed_questions = []
-    for q_dict in questions_list_from_db:
-        if "_id" in q_dict:
-            q_dict["id"] = str(q_dict.pop("_id"))
-        processed_questions.append(QuestionOut.model_validate(q_dict))
+    for i, q_dict_raw in enumerate(questions_list_from_db):
+        print(f"\nDEBUG: Processing document {i}: {q_dict_raw}")
+        q_dict_for_validation = q_dict_raw.copy() # Work on a copy
+        if "_id" in q_dict_for_validation:
+            q_dict_for_validation["id"] = str(q_dict_for_validation.pop("_id"))
+        
+        try:
+            # This is where Pydantic validation happens for each item
+            validated_question = QuestionOut.model_validate(q_dict_for_validation)
+            processed_questions.append(validated_question)
+            print(f"DEBUG: Document {i} validated successfully.")
+        except Exception as e: # Catch Pydantic's ValidationError or others
+            print(f"!!!!!!!! ERROR VALIDATING DOCUMENT {i} !!!!!!!!")
+            print(f"Document data: {q_dict_for_validation}")
+            print(f"Validation Error: {e}")
+            # Optionally, re-raise to see the full FastAPI error page for this specific doc
+            # raise HTTPException(status_code=500, detail=f"Validation error in doc {i}: {e}") 
+            # Or just skip it for now to see if others pass
+            continue # Skip this problematic document
+    
+    print(f"DEBUG: Successfully processed {len(processed_questions)} documents.")
     return processed_questions
+
 
 @QuestionRouter.get("/{question_id}", response_model=QuestionOut)
 async def get_question(

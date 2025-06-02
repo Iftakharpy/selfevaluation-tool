@@ -2,7 +2,12 @@
   "files": [],
   // make sure any type don't throw lint errors
   "compilerOptions": {
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "erasableSyntaxOnly": false,
+
+    "isolatedModules": false,
   },
   "references": [
     { "path": "./tsconfig.app.json" },

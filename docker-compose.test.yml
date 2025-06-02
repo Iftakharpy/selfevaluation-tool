@@ -1,0 +1,47 @@
+services:
+  survey-api-test:
+    build:
+      context: ./api
+      dockerfile: Dockerfile # Uses your existing API Dockerfile
+    container_name: survey_api_test_runner
+    volumes:
+      # Mount the entire api directory to make tests and app code accessible
+      # The WORKDIR in your api/Dockerfile is /root/. Pytest will be run from this context.
+      - ./api:/root
+    environment:
+      - MONGO_URL=mongodb://mongodb-test:27017 # Connect to the test MongoDB service
+      - DATABASE_NAME=survey_db_test          # CRUCIAL: Use a SEPARATE database for tests
+      - SESSION_SECRET_KEY=a_secure_test_secret_for_sessions # Use a distinct test secret
+      # Add any other environment variables your API might need specifically for testing
+      # For example, if your settings.py reads other env vars:
+      # - SOME_OTHER_API_SETTING=test_value
+    depends_on:
+      - mongodb-test
+    command: >
+      sh -c "
+        echo 'Waiting for MongoDB (mongodb-test:27017) to be ready...' &&
+        until mongo mongodb-test:27017/$$DATABASE_NAME --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' > /dev/null 2>&1; do
+          printf '.' && sleep 1;
+        done &&
+        echo 'MongoDB is ready.' &&
+        echo 'Running Pytest tests...' &&
+        pytest -n 0 -vv --color=yes tests/
+      "
+      # -n 0: Explicitly disable pytest-xdist, as per your pytest.ini. Remove if using xdist.
+      # -vv: for verbose output
+      # --color=yes: to force color output in logs
+      # tests/: specifies the directory to run tests from (relative to WORKDIR /root/)
+
+  mongodb-test:
+    image: mongo:latest
+    container_name: mongodb_test_instance
+    ports:
+      - "27019:27017" # Map to a different host port (e.g., 27019) to avoid conflicts
+    volumes:
+      - mongodb_test_data:/data/db # Use a separate named volume for test data
+    restart: unless-stopped # Keeps DB running if needed for inspection after tests, or use 'no'
+
+volumes:
+  mongodb_test_data: # Define the named volume for the test database
+    driver: local
+  
