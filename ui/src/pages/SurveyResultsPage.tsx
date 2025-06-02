@@ -10,6 +10,7 @@ import { useNotifier } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import CourseResultCard from '../components/results/CourseResultCard';
 import Button from '../components/forms/Button';
+import courseService from '../services/courseService'; // To fetch course names
 
 const SurveyResultsPage: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();

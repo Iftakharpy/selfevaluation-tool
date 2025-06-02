@@ -1,74 +1,67 @@
-# core/config.py
+# api/app/core/settings.py
 import os
-from pymongo import AsyncMongoClient
-from pymongo.asynchronous.database import AsyncDatabase
-
-
+from pymongo import AsyncMongoClient # type: ignore
+from pymongo.asynchronous.database import AsyncDatabase # type: ignore
 
 class DataBase:
-    client: AsyncMongoClient|None = None
-    db: AsyncDatabase|None = None
+    client: AsyncMongoClient | None = None
+    db: AsyncDatabase | None = None
 
 MONGO_DB = DataBase()
 
-DATABASE_NAME = "survey_db"
-MONGO_DATABASE_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-# MONGO_DATABASE_URL = os.getenv("MONGO_URL", "mongodb://mongodb_container:27017")
+# --- Database Configuration ---
+# These are typically set by environment variables in Docker Compose files
+DATABASE_NAME = os.getenv("DATABASE_NAME", "survey_db_default") # Default if not set by env
+MONGO_DATABASE_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017") 
 
+# --- Session Management ---
+SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "a_very_default_and_insecure_secret_key_CHANGE_ME")
 
-SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "your-super-secret-key-for-sessions-CHANGE-ME") # IMPORTANT: Change this in prod!
-# For production, ensure this is a strong, randomly generated key and stored securely.
-
-# Password Hashing Algorithm
+# --- Security ---
 PWD_ALGORITHM = "bcrypt"
 
+# --- Port Information (Primarily for CORS and informational purposes) ---
+# These are the ports *inside* the containers if not overridden by Uvicorn/Vite args
+# The actual host ports are defined in docker-compose files.
+UI_INTERNAL_VITE_PORT = os.getenv("UI_INTERNAL_VITE_PORT", "5173")
+API_INTERNAL_UVICORN_PORT = os.getenv("API_INTERNAL_UVICORN_PORT", "8000")
 
-FRONTEND_PORT = os.getenv("FRONTEND_PORT", "5173")  # Default Vite dev server port
-FASTAPI_PORT = os.getenv("FASTAPI_PORT", "8000")  # Default FastAPI port
-ALLOWED_ORIGINS = [
-    f"http://localhost:{FRONTEND_PORT}",  # React app
-    f"http://localhost:{FASTAPI_PORT}",  # FastAPI app
-    "https://your-production-domain.com",  # Production domain, change as needed
-] # Everything for now
+# --- CORS Configuration ---
+# Define origins based on how the UI is accessed on the HOST machine
+# For Production:
+PROD_UI_DOMAIN = os.getenv("PROD_UI_DOMAIN", None) # e.g., "your-app.com"
+
+# For Development (when accessing services via mapped host ports):
+DEV_UI_HOST_PORT_VITE = os.getenv("DEV_UI_HOST_PORT_VITE", "5174") # e.g., http://localhost:5174
+DEV_NGINX_PROXY_HOST_PORT = os.getenv("DEV_NGINX_PROXY_HOST_PORT", "8080") # e.g., http://localhost:8080
+
+allowed_origins_list = []
+
+# Development origins
+allowed_origins_list.extend([
+    f"http://localhost:{DEV_UI_HOST_PORT_VITE}",
+    f"http://127.0.0.1:{DEV_UI_HOST_PORT_VITE}",
+    f"http://localhost:{DEV_NGINX_PROXY_HOST_PORT}",
+    f"http://127.0.0.1:{DEV_NGINX_PROXY_HOST_PORT}",
+    "http://localhost", # Common for Nginx if it's on host port 80 or appears as such
+    "http://127.0.0.1",
+])
+
+# Production origins
+if PROD_UI_DOMAIN:
+    allowed_origins_list.append(f"http://{PROD_UI_DOMAIN}")
+    allowed_origins_list.append(f"https://{PROD_UI_DOMAIN}")
+
+# Remove duplicates and assign
+ALLOWED_ORIGINS = list(set(allowed_origins_list))
+
+if not ALLOWED_ORIGINS: # Fallback if nothing configured, for extreme local dev only
+    print("WARNING: ALLOWED_ORIGINS is empty. Falling back to allowing '*' for local development ease. Configure PROD_UI_DOMAIN for production.")
+    ALLOWED_ORIGINS = ["*"]
+
+print(f"INFO: Backend CORS Allowed Origins: {ALLOWED_ORIGINS}")
 
 
-ALLOWED_ORIGINS = [
-    f"http://localhost:{FRONTEND_PORT}",      # Vite dev server default
-    f"http://127.0.0.1:{FRONTEND_PORT}",    # Vite dev server via 127.0.0.1
-    f"http://localhost:{FASTAPI_PORT}",      # FastAPI dev server default
-    f"http://127.0.0.1:{FASTAPI_PORT}",      # FastAPI dev server via 127.0.0.1
-    # Add http://localhost for the Nginx dev proxy if it's different from API host
-    # "http://localhost", # If Nginx is on port 80 from the browser's perspective
-    # Potentially others if you access via specific IPs during dev,
-    # but this can become unwieldy.
-    # Example: "http://192.168.1.132:5173"
-    # It's often better to keep this list minimal and rely on VITE_API_DIRECT_URL
-    # for varied manual setups, or ensure dev Nginx correctly forwards Origin.
-]
 
-# When using the dev Nginx proxy (docker-compose.dev.yml), Nginx will forward
-# the original Origin header (e.g., http://localhost if you access nginx on port 80).
-# So, if your Nginx is on http://localhost, then ALLOWED_ORIGINS should include "http://localhost".
-# However, the current CORSMiddleware default behavior for `allow_origin_regex`
-# might handle proxied requests if the Origin header matches one of the listed origins,
-# or if the proxy forwards the correct origin.
-# For the most robust Nginx-proxied setup, ensure Nginx forwards the client's true origin,
-# or allow the proxy's origin if that's how it appears to FastAPI.
+STANDARD_QUESTION_MAX_SCORE: float = 10.0
 
-# Let's refine ALLOWED_ORIGINS for both scenarios:
-# 1. Vite dev server direct access (localhost:5173, 127.0.0.1:5173, specific_ip:5173)
-# 2. Nginx dev proxy access (localhost, or your nginx dev domain)
-
-# A practical approach for development:
-# ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS_DEV", "http://localhost:5173,http://127.0.0.1:5173,http://localhost").split(',')
-# For simplicity with your current setup:
-ALLOWED_ORIGINS = [
-    f"http://localhost:{FRONTEND_PORT}",  # For Vite direct dev access
-    f"http://127.0.0.1:{FRONTEND_PORT}", # For Vite direct dev access
-    f"http://localhost:{FASTAPI_PORT}",       # For accessing through Nginx dev proxy on port 80
-    f"http://127.0.0.1:{FASTAPI_PORT}",
-    # Add any specific IPs you use for development, e.g.:
-    "http://192.168.x.x",
-    "http://<your-ip-address>",
-]
-# If you access your Nginx dev proxy via an IP like http://192.168.x.x, add that too.

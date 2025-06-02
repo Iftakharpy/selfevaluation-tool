@@ -1,7 +1,8 @@
+# api/app/surveys/data_types.py
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 from app.users.data_types import PyObjectId
-from app.questions.data_types import AnswerTypeEnum, ScoreFeedbackItem, FeedbackComparisonEnum # MODIFIED: Imported FeedbackComparisonEnum
+from app.questions.data_types import AnswerTypeEnum, ScoreFeedbackItem, FeedbackComparisonEnum
 from datetime import datetime, UTC
 from enum import Enum
 
@@ -10,7 +11,7 @@ class OutcomeCategoryEnum(str, Enum):
     RECOMMENDED = "RECOMMENDED_TO_TAKE_COURSE"
     ELIGIBLE_FOR_ERPL = "ELIGIBLE_FOR_ERPL"
     NOT_SUITABLE = "NOT_SUITABLE_FOR_COURSE"
-    UNDEFINED = "UNDEFINED" # Fallback category
+    UNDEFINED = "UNDEFINED" 
 
 class OutcomeThresholdItem(BaseModel):
     score_value: float = Field(..., description="The score threshold value.")
@@ -19,7 +20,6 @@ class OutcomeThresholdItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra='forbid', arbitrary_types_allowed=True)
 
 class SurveyQuestionDetail(BaseModel):
-    """Detailed information about a question as part of a survey."""
     question_id: str
     qca_id: str
     course_id: str
@@ -38,11 +38,21 @@ class SurveyBase(BaseModel):
         default_factory=dict, 
         description="Feedback rules based on total scores for each course in the survey. Key is course_id (str)."
     )
-    
     course_outcome_thresholds: Optional[Dict[str, List[OutcomeThresholdItem]]] = Field(
         default_factory=dict,
         description="Outcome categorization rules based on total scores for each course. Key is course_id (str)."
     )
+    
+    # --- NEW FIELDS FOR MAX SCORES ---
+    max_scores_per_course: Optional[Dict[str, float]] = Field(
+        default_factory=dict, # Storing course_id as string key directly
+        description="Maximum possible score for each course in this survey. Key is course_id (str)."
+    )
+    max_overall_survey_score: Optional[float] = Field(
+        None,
+        description="Overall maximum possible score for this survey."
+    )
+    # --- END NEW FIELDS ---
     
     model_config = ConfigDict(
         populate_by_name=True,
@@ -65,47 +75,53 @@ class SurveyBase(BaseModel):
                         {"score_value": 15, "comparison": "lt", "outcome": "RECOMMENDED_TO_TAKE_COURSE"},
                         {"score_value": 15, "comparison": "gte", "outcome": "ELIGIBLE_FOR_ERPL"}
                     ]
-                }
+                },
+                "max_scores_per_course": {"60c72b2f9b1e8b001c8e4d8a": 50.0, "60c72b2f9b1e8b001c8e4d8b": 30.0},
+                "max_overall_survey_score": 80.0 
             }
         }
     )
 
 class SurveyCreate(SurveyBase):
-    pass
+    # Max score fields are calculated on the backend, not provided on create
+    max_scores_per_course: Optional[Dict[str, float]] = Field(None, exclude=True) # type: ignore
+    max_overall_survey_score: Optional[float] = Field(None, exclude=True) # type: ignore
 
-class SurveyUpdate(BaseModel):
+
+class SurveyUpdate(BaseModel): # Does not inherit SurveyBase to control fields strictly
     title: Optional[str] = Field(None, min_length=3, max_length=150)
     description: Optional[str] = Field(None, max_length=1000)
     course_ids: Optional[List[PyObjectId]] = None
     is_published: Optional[bool] = None
     course_skill_total_score_thresholds: Optional[Dict[str, List[ScoreFeedbackItem]]] = None
     course_outcome_thresholds: Optional[Dict[str, List[OutcomeThresholdItem]]] = None
-
+    # Max score fields are recalculated on update by backend
+    # These are not expected in the update payload from client, but are part of SurveyInDB
+    # So, no exclude=True needed here as they are not part of SurveyUpdate Pydantic model
 
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True
     )
 
-class SurveyInDB(SurveyBase):
+class SurveyInDB(SurveyBase): # Inherits all fields from SurveyBase, including new max_score fields
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     created_by: PyObjectId
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-class SurveyOut(SurveyBase):
+class SurveyOut(SurveyBase): # Inherits all fields from SurveyBase
     id: str
     created_by: str
-    course_ids: List[str]
+    course_ids: List[str] # Override to ensure string representation
     created_at: datetime
     updated_at: datetime
-    
     questions: Optional[List[SurveyQuestionDetail]] = Field(None, description="Detailed questions for this survey.")
-
-    course_skill_total_score_thresholds: Optional[Dict[str, List[ScoreFeedbackItem]]]
-    course_outcome_thresholds: Optional[Dict[str, List[OutcomeThresholdItem]]]
+    
+    # max_scores_per_course and max_overall_survey_score are inherited from SurveyBase
+    # Pydantic will handle their serialization if present.
 
     model_config = ConfigDict(
-        from_attributes=True,
+        from_attributes=True, # was orm_mode
         populate_by_name=True
     )

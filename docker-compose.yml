@@ -1,33 +1,37 @@
+# docker-compose.yml
 services:
-  survey-api:
+  survey_api_prod: # Renamed service to match container_name convention
     build:
       context: ./api/
       dockerfile: Dockerfile
-    # In production api is not directly exposed
-    # nginx will route certain traffic to api
-    # ports:
-    #   - "8000:8000"    
+    container_name: survey_api_prod 
+    environment:
+      - MONGO_URL=mongodb://mongodb_prod:27017 # CORRECTED: Match service name
+      - DATABASE_NAME=survey_db_prod 
+      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY_PROD:-a_very_strong_default_prod_secret} # Use default if not in .env
+      - PROD_UI_DOMAIN=${PROD_UI_DOMAIN:-your-app.com} # For CORS settings
     restart: always
+    stop_grace_period: 2s
 
-  # Nginx will serve the static ui files from react/ui
-  nginx-proxy:
+  nginx_prod_proxy: 
     depends_on: 
-      - survey-api
+      - survey_api_prod
     build: 
       context: ./ui/
       dockerfile: Dockerfile
+    container_name: nginx_prod_proxy 
     ports: 
-      - "80:80"
+      - "80:80" 
     restart: always
 
-  mongodb:
-    image: mongo:latest # Use the official MongoDB image
-    container_name: mongodb_container # Optional: give your container a name
+  mongodb_prod: 
+    image: mongo:latest
+    container_name: mongodb_prod
     ports:
-      - "27017:27017" # Expose the default MongoDB port
+      - "127.0.0.1:27017:27017" 
     volumes:
-      - mongodb_data:/data/db # Persist data to a named volume
+      - mongodb_prod_data:/data/db 
     restart: always
 
 volumes:
-  mongodb_data: # Define the named volume
+  mongodb_prod_data:

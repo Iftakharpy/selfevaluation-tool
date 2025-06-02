@@ -17,7 +17,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer 
     // Using a more common pattern for the overlay and modal container
     <div 
       className="z-10 fixed inset-0 overflow-y-auto backdrop-blur-xs backdrop-brightness-50 flex items-center justify-center p-4"
-      onClick={onClose} // Click on overlay closes modal
+      // onClick={onClose} // Click on overlay closes modal
     >
       <div 
         className="z-50 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"

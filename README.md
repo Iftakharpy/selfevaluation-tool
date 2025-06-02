@@ -3,6 +3,9 @@
   - [Production environment setup guide](#production-environment-setup-guide)
   - [Development environment setup guide](#development-environment-setup-guide)
   - [Development using docker compose - supports auto reload both in frontend and backend](#development-using-docker-compose---supports-auto-reload-both-in-frontend-and-backend)
+  - [Running tests](#running-tests)
+  - [Test for production setup](#test-for-production-setup)
+  - [Manual process](#manual-process)
     - [FastAPI backend](#fastapi-backend)
     - [React Frontend](#react-frontend)
 
@@ -63,11 +66,26 @@ Steps to run the server:
 Before running these commands Go to the directory where your project is for me it's `C:\Users\iftak\Desktop\jamk\2025 Spring\narsus-self-evaluation-tool\`. You can use docker desktop for easy log checking and other stats.
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d # after first build
-docker compose -f docker-compose.dev.yml down # to tear down all the containers
 docker compose -f docker-compose.dev.yml up --build # If any dockerfile is changed and required for the first time
+docker compose -f docker-compose.dev.yml up -d # after first build
+docker compose -f docker-compose.dev.yml down # teardown
+docker compose -f docker-compose.dev.yml down -fv # teardown and clean up volumes
 ```
 
+## Running tests
+```bash
+docker compose -f docker-compose.test.yml up -d --build # Check docker desktop container logs
+docker compose -f docker-compose.test.yml down -fv # teardown
+```
+
+## Test for production setup
+```bash
+docker compose up -d --build # Check docker desktop container logs
+docker compose down # teardown but keeps the volumes
+```
+
+
+## Manual process
 
 ### FastAPI backend
 
