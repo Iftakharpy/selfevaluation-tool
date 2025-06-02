@@ -63,7 +63,7 @@ Steps to run the server:
 ## Development environment setup guide
 
 ## Development using docker compose - supports auto reload both in frontend and backend
-Before running these commands Go to the directory where your project is for me it's `C:\Users\iftak\Desktop\jamk\2025 Spring\narsus-self-evaluation-tool\`. You can use docker desktop for easy log checking and other stats.
+Before running these commands Go to the directory where your project is for me it's `C:\Users\iftak\Desktop\jamk\2025 Spring\00-self-evaluation-tool\`. You can use docker desktop for easy log checking and other stats.
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build # If any dockerfile is changed and required for the first time
