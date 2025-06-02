@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import questionService from '../services/questionService';
-import qcaService from '../services/qcaService'; // Import QCA Service
+import qcaService from '../services/qcaService'; 
 import type { QuestionListItemFE, QuestionFE, QuestionCreateFE, QuestionUpdateFE } from '../types/questionTypes';
-import type { QCA, QCACreate, QCAUpdate } from '../types/qcaTypes'; // Import QCA types
+import type { QCA, QCACreate, QCAUpdate, AnswerAssociationTypeEnumFE } from '../types/qcaTypes'; 
 import ResourceTable from '../components/management/ResourceTable';
 import type { Column } from '../components/management/ResourceTable';
 import Button from '../components/forms/Button';
@@ -10,6 +10,7 @@ import Modal from '../components/modals/Modal';
 import QuestionForm from '../components/forms/QuestionForm';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { useNotifier } from '../contexts/NotificationContext';
+import Input from '../components/forms/Input'; 
 
 const QuestionsPage: React.FC = () => {
   const [questions, setQuestions] = useState<QuestionListItemFE[]>([]);
@@ -17,11 +18,12 @@ const QuestionsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   
-  const [editingQuestion, setEditingQuestion] = useState<QuestionFE | null>(null); // Full QuestionFE for form
-  const [editingQuestionQCAs, setEditingQuestionQCAs] = useState<QCA[]>([]); // QCAs for the question being edited
+  const [editingQuestion, setEditingQuestion] = useState<QuestionFE | null>(null); 
+  const [editingQuestionQCAs, setEditingQuestionQCAs] = useState<QCA[]>([]); 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null); 
+  const [searchTerm, setSearchTerm] = useState(''); 
   
   const { addNotification } = useNotifier();
 
@@ -49,7 +51,7 @@ const QuestionsPage: React.FC = () => {
   };
 
   const handleOpenEditModal = async (questionItem: QuestionListItemFE) => {
-    setIsLoading(true); // Or a specific loading state for the form
+    setIsSubmitting(true); 
     setFormError(null);
     try {
         const fullQuestionData = await questionService.getQuestion(questionItem.id);
@@ -60,12 +62,20 @@ const QuestionsPage: React.FC = () => {
     } catch (error: any) {
         addNotification(error.message || 'Failed to fetch question details for editing.', 'error');
     } finally {
-        setIsLoading(false);
+        setIsSubmitting(false); 
     }
   };
 
   const handleOpenDeleteModal = (questionItem: QuestionListItemFE) => {
-    setEditingQuestion({ id: questionItem.id, title: questionItem.title, answer_type: questionItem.answer_type, scoring_rules: {} }); 
+    const qToDelete: QuestionFE = { 
+        id: questionItem.id, 
+        title: questionItem.title, 
+        answer_type: questionItem.answer_type, 
+        details: questionItem.details,
+        answer_options: {}, 
+        scoring_rules: {} 
+    };
+    setEditingQuestion(qToDelete); 
     setIsDeleteModalOpen(true);
   };
   
@@ -82,7 +92,7 @@ const QuestionsPage: React.FC = () => {
 
   const handleSubmitQuestionAndQCAs = async (
     questionData: QuestionCreateFE | QuestionUpdateFE,
-    qcasToUpdate: Array<QCACreate | (QCAUpdate & { id?: string })>,
+    qcasToUpdateOrCrate: Array<QCACreate | (QCAUpdate & { id?: string })>, // Renamed for clarity
     qcasToDelete: string[]
   ) => {
     setIsSubmitting(true);
@@ -90,13 +100,12 @@ const QuestionsPage: React.FC = () => {
     let currentQuestionId = editingQuestion?.id;
 
     try {
-      // 1. Create or Update the Question
-      if (currentQuestionId) { // Update existing question
+      if (currentQuestionId) { 
         await questionService.updateQuestion(currentQuestionId, questionData as QuestionUpdateFE);
         addNotification('Question updated successfully!', 'success');
-      } else { // Create new question
+      } else { 
         const newQuestion = await questionService.createQuestion(questionData as QuestionCreateFE);
-        currentQuestionId = newQuestion.id; // Get ID for new question
+        currentQuestionId = newQuestion.id; 
         addNotification('Question created successfully!', 'success');
       }
 
@@ -104,37 +113,61 @@ const QuestionsPage: React.FC = () => {
         throw new Error("Failed to get question ID for QCA operations.");
       }
 
-      // 2. Process QCAs to Delete
       for (const qcaId of qcasToDelete) {
         await qcaService.deleteQCA(qcaId);
       }
       if (qcasToDelete.length > 0) addNotification(`${qcasToDelete.length} course association(s) removed.`, 'info');
 
-      // 3. Process QCAs to Create or Update
-      for (const qca of qcasToUpdate) {
-		// @ts-ignore - currentQuestionId is guaranteed to be defined here
-        if (qca?.id) { // Update existing QCA
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { id, question_id, ...updateData } = qca as QCAUpdate & {id: string, question_id?:string}; // question_id not needed for update payload
-		  // @ts-ignore - currentQuestionId is guaranteed to be defined here		  
-          await qcaService.updateQCA(qca.id, updateData);
-        } else { // Create new QCA
-		  // @ts-ignore - currentQuestionId is guaranteed to be defined here
-          const createData: QCACreate = {
-            ...qca,
-            question_id: currentQuestionId, // Assign current question ID
+      // Process QCAs to Create or Update
+      for (const qcaDataFromForm of qcasToUpdateOrCrate) {
+        if (qcaDataFromForm.id) { // This QCA exists, so update it
+          const updatePayload: QCAUpdate = {
+            answer_association_type: qcaDataFromForm.answer_association_type,
+            feedbacks_based_on_score: qcaDataFromForm.feedbacks_based_on_score,
           };
-          await qcaService.createQCA(createData);
+          // Only include fields if they are actually present in qcaDataFromForm
+          // (Pydantic on backend handles optional fields if not sent)
+          if (qcaDataFromForm.answer_association_type === undefined) {
+            delete updatePayload.answer_association_type;
+          }
+          if (qcaDataFromForm.feedbacks_based_on_score === undefined) {
+            delete updatePayload.feedbacks_based_on_score;
+          }
+          await qcaService.updateQCA(qcaDataFromForm.id, updatePayload);
+        } else { // New QCA, create it
+          const createPayload: QCACreate = {
+            question_id: currentQuestionId, // Always use the current question's ID
+            course_id: qcaDataFromForm.course_id, // Must be present from the form
+            answer_association_type: qcaDataFromForm.answer_association_type,
+            feedbacks_based_on_score: qcaDataFromForm.feedbacks_based_on_score,
+          };
+          await qcaService.createQCA(createPayload);
         }
       }
-      if (qcasToUpdate.length > 0) addNotification(`${qcasToUpdate.length} course association(s) saved.`, 'info');
+      if (qcasToUpdateOrCrate.length > 0) addNotification(`${qcasToUpdateOrCrate.length} course association(s) saved.`, 'info');
       
       handleCloseModal();
-      fetchQuestionsAndDependencies(); // Refresh list
+      fetchQuestionsAndDependencies(); 
     } catch (error: any) {
-      const msg = error.response?.data?.detail || (editingQuestion?.id ? 'Failed to update question/associations.' : 'Failed to create question/associations.');
-      setFormError(msg);
-      addNotification(msg, 'error');
+      let friendlyErrorMessage = "An unexpected error occurred during submission.";
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          friendlyErrorMessage = error.response.data.detail
+            .map((err: any) => {
+                const loc = err.loc && err.loc.length > 1 ? err.loc.slice(1).join(' -> ') : 'General';
+                return `${loc}: ${err.msg}`;
+            })
+            .join('; ');
+        } 
+        else if (typeof error.response.data.detail === 'string') {
+          friendlyErrorMessage = error.response.data.detail;
+        }
+      } else if (error.message) {
+        friendlyErrorMessage = error.message;
+      }
+      
+      setFormError(friendlyErrorMessage); 
+      addNotification(friendlyErrorMessage, 'error'); 
     } finally {
       setIsSubmitting(false);
     }
@@ -144,7 +177,6 @@ const QuestionsPage: React.FC = () => {
     if (!editingQuestion || !editingQuestion.id) return;
     setIsSubmitting(true);
     try {
-      // Backend should handle deleting associated QCAs when a question is deleted
       await questionService.deleteQuestion(editingQuestion.id);
       addNotification('Question (and its associations) deleted successfully!', 'success');
       handleCloseDeleteModal();
@@ -155,6 +187,12 @@ const QuestionsPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  const filteredQuestions = questions.filter(question =>
+    question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (question.details && question.details.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    question.answer_type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const columns: Column<QuestionListItemFE>[] = [
     { header: 'Title', accessor: 'title', className: 'font-medium text-gray-900' },
@@ -171,12 +209,23 @@ const QuestionsPage: React.FC = () => {
         </Button>
       </div>
 
+      <div className="mb-4">
+        <Input
+          id="question-search"
+          type="text"
+          placeholder="Search by title, details, or type..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          containerClassName="max-w-md"
+        />
+      </div>
+
       <ResourceTable<QuestionListItemFE>
-        data={questions}
+        data={filteredQuestions}
         columns={columns}
         onEdit={handleOpenEditModal}
         onDelete={handleOpenDeleteModal}
-        isLoading={isLoading && !isModalOpen} // Don't show table loading if modal is open and loading its data
+        isLoading={isLoading && !isModalOpen} 
       />
 
       <Modal
@@ -184,15 +233,14 @@ const QuestionsPage: React.FC = () => {
         onClose={handleCloseModal}
         title={editingQuestion?.id ? 'Edit Question' : 'Create New Question'}
       >
-        {/* @ts-ignore - currentQuestionId is guaranteed to be defined here */}
-        {(isModalOpen && (editingQuestion || !editingQuestion?.id)) && ( // Ensure form is rendered only when ready
+        {(isModalOpen && (editingQuestion || !editingQuestion?.id)) && ( 
              <QuestionForm
                 initialData={editingQuestion}
                 initialQcas={editingQuestionQCAs}
                 onSubmit={handleSubmitQuestionAndQCAs}
                 onCancel={handleCloseModal}
                 isSubmitting={isSubmitting}
-                submitError={formError}
+                submitError={formError} 
             />
         )}
       </Modal>
