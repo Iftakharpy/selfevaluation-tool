@@ -10,7 +10,7 @@ import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { useNotifier } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom'; 
-import SurveyForm from '../components/forms/SurveyForm'; // Ensure this import is correct
+import SurveyForm from '../components/forms/SurveyForm'; 
 
 const SurveyManagementPage: React.FC = () => {
   const [mySurveys, setMySurveys] = useState<SurveySummaryListItemFE[]>([]);
@@ -31,9 +31,14 @@ const SurveyManagementPage: React.FC = () => {
     if (!user) return;
     setIsLoading(true);
     try {
+      // Assuming listAllSurveysForTeacher returns surveys created by the current teacher
+      // or all surveys if general teacher access is intended.
+      // The current logic filters client-side if needed, or relies on backend filtering.
       const allSurveys = await surveyService.listAllSurveysForTeacher();
-      const filteredSurveys = allSurveys.filter(survey => survey.created_by === user.id);
-      setMySurveys(filteredSurveys);
+      // If backend doesn't filter by created_by, you might need to filter here:
+      // const filteredSurveys = allSurveys.filter(survey => survey.created_by === user.id);
+      // setMySurveys(filteredSurveys);
+      setMySurveys(allSurveys.filter(survey => survey.created_by === user.id)); // Ensure only my surveys are shown
     } catch (error: any) {
       addNotification(error.message || 'Failed to fetch surveys', 'error');
     } finally {
@@ -61,12 +66,21 @@ const SurveyManagementPage: React.FC = () => {
     } catch (error: any) {
         addNotification(error.message || 'Failed to fetch survey details for editing.', 'error');
     } finally {
-        setIsLoading(false); // Should be for the specific modal loading, not global table
+        // Only set loading to false specific to modal data, not table loading
+        // If you have a separate state for modal loading, use that.
+        // For now, assuming this doesn't interfere with table's isLoading
     }
   };
 
   const handleOpenDeleteModal = (surveyItem: SurveySummaryListItemFE) => {
-    setEditingSurvey(surveyItem as SurveyFE); 
+    // We only need id and title for the confirmation modal for SurveyFE type
+    const surveyForDelete: SurveyFE = { 
+        ...surveyItem, 
+        questions: [], // Add default/empty for fields not in SurveySummaryListItemFE
+        course_skill_total_score_thresholds: {},
+        course_outcome_thresholds: {}
+    };
+    setEditingSurvey(surveyForDelete); 
     setIsDeleteModalOpen(true);
   };
   
@@ -96,8 +110,8 @@ const SurveyManagementPage: React.FC = () => {
       fetchMySurveys(); 
     } catch (error: any) {
       const msg = error.response?.data?.detail || (editingSurvey ? 'Failed to update survey.' : 'Failed to create survey.');
-      setFormError(msg); // Set form-specific error to display in modal
-      addNotification(msg, 'error'); // Also show global notification
+      setFormError(msg); 
+      addNotification(msg, 'error'); 
     } finally {
       setIsSubmitting(false);
     }
@@ -132,6 +146,18 @@ const SurveyManagementPage: React.FC = () => {
     }
   };
 
+  const handleCopyLink = (surveyId: string) => {
+    const link = `${window.location.origin}/survey/take/${surveyId}`;
+    navigator.clipboard.writeText(link)
+      .then(() => {
+        addNotification('Survey link copied to clipboard!', 'success');
+      })
+      .catch(err => {
+        console.error('Failed to copy link: ', err);
+        addNotification('Failed to copy link. Please copy manually.', 'error');
+      });
+  };
+
   const columns: Column<SurveySummaryListItemFE>[] = [
     { header: 'Title', accessor: 'title', className: 'font-medium text-gray-900' },
     { 
@@ -159,8 +185,12 @@ const SurveyManagementPage: React.FC = () => {
           <Button size="xs" variant="ghost" onClick={() => handleTogglePublish(item)} disabled={isSubmitting || isLoading}>
             {item.is_published ? 'Unpublish' : 'Publish'}
           </Button>
-           <Button size="xs" variant="ghost" onClick={() => navigate(`/surveys/${item.id}/attempts-overview`)} disabled={isSubmitting || isLoading}>
+          <Button size="xs" variant="ghost" onClick={() => navigate(`/surveys/${item.id}/attempts-overview`)} disabled={isSubmitting || isLoading}>
             Attempts
+          </Button>
+          {/* ADDED COPY LINK BUTTON */}
+          <Button size="xs" variant="ghost" onClick={() => handleCopyLink(item.id)} disabled={isLoading}>
+            Copy Link
           </Button>
           <Button size="xs" variant="danger" onClick={() => handleOpenDeleteModal(item)} disabled={isSubmitting || isLoading}>Delete</Button>
         </div>
@@ -181,6 +211,7 @@ const SurveyManagementPage: React.FC = () => {
         data={mySurveys}
         columns={columns}
         isLoading={isLoading}
+        // onEdit, onDelete are handled by the custom accessor column now
       />
 
       <Modal

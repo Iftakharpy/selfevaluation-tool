@@ -1,6 +1,6 @@
 # api/app/survey_attempts/router.py
 from fastapi import APIRouter, HTTPException, status, Depends, Query
-from typing import List, Optional, Dict, Any, Tuple, Union # Added Union
+from typing import List, Optional, Dict, Any, Tuple, Union 
 from bson import ObjectId
 from datetime import datetime, UTC 
 
@@ -14,13 +14,13 @@ from app.core.db import (
 )
 from app.users.auth import get_current_active_user, require_teacher_role 
 from app.users.data_types import UserInDB, PyObjectId, RoleEnum
-from app.surveys.data_types import ( # These come from surveys.data_types
+from app.surveys.data_types import ( 
     SurveyInDB, 
-    ScoreFeedbackItem as SurveyScoreFeedbackItem, # Alias for clarity if needed
+    ScoreFeedbackItem as SurveyScoreFeedbackItem, 
     OutcomeThresholdItem, 
     OutcomeCategoryEnum  
 )
-from app.surveys.router import _get_survey_question_details # Helper from survey router
+from app.surveys.router import _get_survey_question_details 
 from app.questions.data_types import ScoreFeedbackItem as QuestionScoreFeedbackItem, FeedbackComparisonEnum, AnswerTypeEnum 
 from app.qca.data_types import AnswerAssociationTypeEnum
 from .data_types import (
@@ -28,7 +28,7 @@ from .data_types import (
     StudentAnswerPayload, StudentAnswerInDB, StudentAnswerOut,
     SubmitAnswersRequest, SurveyAttemptInDB, SurveyAttemptResultOut
 )
-from app.core.settings import STANDARD_QUESTION_MAX_SCORE # IMPORTED CONSTANT
+from app.core.settings import STANDARD_QUESTION_MAX_SCORE 
 
 SurveyAttemptRouter = APIRouter()
 
@@ -77,15 +77,12 @@ async def calculate_score_for_answer(question_dict: Dict, student_answer_value: 
     if q_type == AnswerTypeEnum.multiple_choice:
         correct_key = rules.get("correct_option_key")
         option_scores = rules.get("option_scores")
-        # MODIFIED BLOCK START
         score_if_correct = rules.get("score_if_correct", STANDARD_QUESTION_MAX_SCORE)
-        score_if_incorrect = rules.get("score_if_incorrect", 0.0) # Or another default if specified
-        # MODIFIED BLOCK END
+        score_if_incorrect = rules.get("score_if_incorrect", 0.0)
 
         if option_scores and isinstance(option_scores, dict) and student_answer_value in option_scores:
             raw_score = float(option_scores[student_answer_value])
         elif correct_key is not None:
-            # MODIFIED LINE
             raw_score = float(score_if_correct) if correct_key == student_answer_value else float(score_if_incorrect)
     
     elif q_type == AnswerTypeEnum.multiple_select:
@@ -104,7 +101,7 @@ async def calculate_score_for_answer(question_dict: Dict, student_answer_value: 
             penalty_val = float(rules.get("penalty_per_incorrect", 0.0))
             for key in selected_keys:
                 if key in correct_option_keys: current_raw_score += score_val
-                elif key in options: current_raw_score += penalty_val # Penalty only for selecting defined incorrect options
+                elif key in options: current_raw_score += penalty_val 
         raw_score = current_raw_score
     
     elif q_type == AnswerTypeEnum.input:
@@ -135,13 +132,12 @@ async def calculate_score_for_answer(question_dict: Dict, student_answer_value: 
 
 def _evaluate_feedback_rules(
     score: float, 
-    feedback_rules_input: Optional[List[Any]] # Accept list of dicts or model instances
+    feedback_rules_input: Optional[List[Any]] 
 ) -> Optional[str]:
     if not feedback_rules_input: return None
-    # Using Any for rule_input as it can be dict or Pydantic model before validation
     feedback_rules_validated: List[Union[QuestionScoreFeedbackItem, SurveyScoreFeedbackItem]] = []
     for rule_input_untyped in feedback_rules_input:
-        rule_input: Any = rule_input_untyped # type hint for clarity
+        rule_input: Any = rule_input_untyped 
         if isinstance(rule_input, (QuestionScoreFeedbackItem, SurveyScoreFeedbackItem)):
             feedback_rules_validated.append(rule_input)
         elif isinstance(rule_input, dict):
@@ -167,7 +163,7 @@ def _evaluate_feedback_rules(
 
 def _evaluate_outcome_rules(
     score: float,
-    outcome_rules_input: Optional[List[Any]] # Accept list of dicts or model instances
+    outcome_rules_input: Optional[List[Any]] 
 ) -> OutcomeCategoryEnum:
     if not outcome_rules_input: return OutcomeCategoryEnum.UNDEFINED
     outcome_rules_validated: List[OutcomeThresholdItem] = []
@@ -263,8 +259,14 @@ async def start_survey_attempt(
     if existing_attempt:
         questions = await _get_survey_question_details(survey)
         return SurveyAttemptStartOut(attempt_id=str(existing_attempt["_id"]), survey_id=str(survey.id), student_id=str(current_user.id), started_at=existing_attempt["started_at"], questions=questions)
-    new_attempt_data = {"student_id": current_user.id, "survey_id": survey.id}
-    new_attempt_obj = SurveyAttemptInDB(**new_attempt_data)
+    
+    # MODIFIED LINE: Use model_validate with a dictionary
+    new_attempt_data_dict: Dict[str, Any] = {
+        "student_id": current_user.id,
+        "survey_id": survey.id
+    }
+    new_attempt_obj = SurveyAttemptInDB.model_validate(new_attempt_data_dict)
+    
     result = await attempt_collection.insert_one(new_attempt_obj.model_dump(by_alias=True))
     created_attempt = await attempt_collection.find_one({"_id": result.inserted_id})
     if not created_attempt: raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not start survey attempt.")
