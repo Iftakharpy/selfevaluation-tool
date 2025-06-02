@@ -41,11 +41,13 @@ const Tooltip: React.FC<TooltipProps> = ({ text, children, position = 'top', cla
   return (
     <div className="relative inline-flex"> {/* This creates a new stacking context for the tooltip */}
       {React.cloneElement(children, {
+        /*@ts-ignore*/
         onMouseEnter: () => setShowTooltip(true),
         onMouseLeave: () => setShowTooltip(false),
         onFocus: () => setShowTooltip(true), 
         onBlur: () => setShowTooltip(false),  
       })}
+
       {showTooltip && (
         <div
           role="tooltip"

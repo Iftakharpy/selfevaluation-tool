@@ -1,3 +1,4 @@
+// File: C:\Users\iftak\Desktop\jamk\2025 Spring\00-self-evaluation-tool\ui\src\components\forms\QuestionForm.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import type { QuestionFE, QuestionCreateFE, QuestionUpdateFE } from '../../types/questionTypes';
@@ -364,20 +365,25 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                     <br/>
                     <InformationCircleIcon className="h-4 w-4 inline mr-1 text-blue-500" />
                     Survey outcomes can be edited from the <strong>Survey Management</strong> page.
-                    <br/>
                 </div>
                 {options.map((opt, index) => (
+                    // Using items-baseline to align based on the text baseline of the inputs
                     <div key={index} className="flex items-center space-x-2 p-2 border rounded bg-gray-50">
                         <Input labelClassName="sr-only" label={`Option ${index+1} Key`} placeholder="Key (e.g. a)" value={opt.key} onChange={e => handleOptionChange(index, 'key', e.target.value)} containerClassName="mb-0 flex-shrink w-20" disabled={isSubmitting}/>
                         <Input labelClassName="sr-only" label={`Option ${index+1} Value`} placeholder="Option Text" value={opt.value} onChange={e => handleOptionChange(index, 'value', e.target.value)} containerClassName="mb-0 flex-grow" disabled={isSubmitting}/>
-                        {answerType === AnswerTypeEnumFE.MULTIPLE_CHOICE && (
-                            <input type="radio" name="correctKey" title="Mark as correct" value={opt.key} checked={correctKey === opt.key} onChange={() => handleCorrectKeyChange(opt.key)} className="form-radio h-5 w-5 text-indigo-600" disabled={isSubmitting}/>
-                        )}
-                        {answerType === AnswerTypeEnumFE.MULTIPLE_SELECT && (
-                             <input type="checkbox" value={opt.key} title="Mark as correct" checked={correctKeys.includes(opt.key)} onChange={() => handleCorrectKeyChange(opt.key)} className="form-checkbox h-5 w-5 text-indigo-600 rounded" disabled={isSubmitting}/>
-                        )}
-                        <Input labelClassName="sr-only" label={`Score for ${opt.key}`} type="number" step="any" placeholder="Score (opt.)" value={optionScores[opt.key] === undefined ? '' : optionScores[opt.key]} onChange={e => handleOptionScoreChange(opt.key, e.target.value)} containerClassName="mb-0 w-24" disabled={isSubmitting}/>
-                        <Button type="button" variant="danger" size="xs" onClick={() => removeOption(index)} disabled={isSubmitting}>X</Button>
+                        
+                        {/* Radio/Checkbox - these are small, their container needs to align */}
+                        <div className="flex items-center self-center px-1"> {/* self-center within the items-baseline row */}
+                            {answerType === AnswerTypeEnumFE.MULTIPLE_CHOICE && (
+                                <input type="radio" name="correctKey" title="Mark as correct" value={opt.key} checked={correctKey === opt.key} onChange={() => handleCorrectKeyChange(opt.key)} className="form-radio h-5 w-5 text-indigo-600" disabled={isSubmitting}/>
+                            )}
+                            {answerType === AnswerTypeEnumFE.MULTIPLE_SELECT && (
+                                <input type="checkbox" value={opt.key} title="Mark as correct" checked={correctKeys.includes(opt.key)} onChange={() => handleCorrectKeyChange(opt.key)} className="form-checkbox h-5 w-5 text-indigo-600 rounded" disabled={isSubmitting}/>
+                            )}
+                        </div>
+
+                        <Input labelClassName="sr-only" label={`Score for ${opt.key}`} type="number" step="any" placeholder="Score (opt.)" value={optionScores[opt.key] === undefined ? '' : optionScores[opt.key]} onChange={e => handleOptionScoreChange(opt.key, e.target.value)} containerClassName="mb-0 w-24 " disabled={isSubmitting}/>
+                        <Button type="button" variant="danger" size="md" onClick={() => removeOption(index)} disabled={isSubmitting} className="self-start">X</Button> 
                     </div>
                 ))}
                 <Button type="button" variant="secondary" size="sm" onClick={addOption} disabled={isSubmitting}>Add Option</Button>
@@ -385,8 +391,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
         )}
         {answerType === AnswerTypeEnumFE.INPUT && (
             <div className="space-y-3 mt-2">
-                {/*@ts-ignore */}
-                 <Input type="number" label={
+                { /* @ts-ignore - using a span with tooltip for label */}
+                <Input type="number" label={
                     <span className="flex items-center">Max Length (Optional)
                         <Tooltip text="Maximum allowed characters for the input.">
                              <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
@@ -399,14 +405,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                     </Tooltip>
                 </h5>
                 {expectedAnswers.map((ea, index) => (
-                    <div key={index} className="flex items-end space-x-2 p-2 border rounded bg-gray-50">
+                    <div key={index} className="flex items-baseline space-x-2 p-2 border rounded bg-gray-50"> {/* Changed to items-baseline */}
                         <Textarea labelClassName="sr-only" label="Expected Text" placeholder="Expected Text" value={ea.text} onChange={e => handleExpectedAnswerChange(index, 'text', e.target.value)} rows={1} containerClassName="mb-0 flex-grow" disabled={isSubmitting}/>
                         <Input labelClassName="sr-only" label="Score" type="number" step="any" placeholder="Score" value={ea.score} onChange={e => handleExpectedAnswerChange(index, 'score', e.target.value)} containerClassName="mb-0 w-24" disabled={isSubmitting}/>
-                        <label className="flex items-center space-x-1 text-sm">
+                        <label className="flex items-center space-x-1 text-sm self-center"> {/* self-center */}
                             <input type="checkbox" checked={ea.case_sensitive} onChange={e => handleExpectedAnswerChange(index, 'case_sensitive', e.target.checked)} className="form-checkbox h-4 w-4 text-indigo-600 rounded" disabled={isSubmitting}/>
                             <span>Case Sensitive</span>
                         </label>
-                        <Button type="button" variant="danger" size="xs" onClick={() => removeExpectedAnswer(index)} disabled={isSubmitting}>X</Button>
+                        <Button type="button" variant="danger" size="md" onClick={() => removeExpectedAnswer(index)} disabled={isSubmitting} className="self-center">X</Button>
                     </div>
                 ))}
                 <Button type="button" variant="secondary" size="sm" onClick={addExpectedAnswer} disabled={isSubmitting}>Add Expected Answer</Button>
@@ -417,7 +423,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                 <Input type="number" label="Min Value" value={rangeMin} onChange={e => setRangeMin(parseFloat(e.target.value))} disabled={isSubmitting}/>
                 <Input type="number" label="Max Value" value={rangeMax} onChange={e => setRangeMax(parseFloat(e.target.value))} disabled={isSubmitting}/>
                 <Input type="number" label="Step" value={rangeStep} onChange={e => setRangeStep(parseFloat(e.target.value))} disabled={isSubmitting}/>
-                {/*@ts-ignore */}
+                { /* @ts-ignore */}
                 <Input type="number" label={
                     <span className="flex items-center">Target Value
                          <Tooltip text="The ideal value the student should select for maximum points.">
@@ -425,7 +431,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                         </Tooltip>
                     </span>
                 } value={targetValue} onChange={e => setTargetValue(parseFloat(e.target.value))} disabled={isSubmitting}/>
-                {/*@ts-ignore */}
+                { /* @ts-ignore */}
                 <Input type="number" label={
                      <span className="flex items-center">Score at Target
                          <Tooltip text="Points awarded if student selects the target value. Capped at 10 by the system.">
@@ -434,7 +440,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                     </span>
                 } step="any" value={scoreAtTarget} onChange={e => setScoreAtTarget(parseFloat(e.target.value))} disabled={isSubmitting}/>
                 {/*@ts-ignore */}
-                <Input type="number" label={
+                <Input type="number" label={ 
                      <span className="flex items-center">Score Change per Deviation
                          <Tooltip text="Points to add/subtract (usually negative) for each unit of deviation from the target value.">
                              <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
@@ -457,7 +463,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
               <Input label={`Score Value ${index + 1}`} type="number" step="any" value={fb.score_value} onChange={(e) => updateFeedbackItem(index, 'score_value', e.target.value)} error={fieldErrors[`feedback_score_${index}`]} disabled={isSubmitting} containerClassName="mb-0" />
               <Select label="Comparison" options={comparisonOptions} value={fb.comparison} onChange={(e) => updateFeedbackItem(index, 'comparison', e.target.value as FeedbackComparisonEnumFE)} disabled={isSubmitting} containerClassName="mb-0" />
-              <Button type="button" variant="danger" size="xs" onClick={() => removeFeedbackItem(index)} disabled={isSubmitting} className="self-end mb-0">Remove</Button>
+              <Button type="button" variant="danger" size="md" onClick={() => removeFeedbackItem(index)} disabled={isSubmitting} className="self-center mb-0">Remove</Button>
             </div>
             <Textarea label={`Feedback Text ${index + 1}`} value={fb.feedback} onChange={(e) => updateFeedbackItem(index, 'feedback', e.target.value)} rows={2} error={fieldErrors[`feedback_text_${index}`]} disabled={isSubmitting} containerClassName="mb-0" />
           </div>
@@ -480,7 +486,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                         containerClassName="mb-0"
                         error={fieldErrors[`qca_course_${qcaIndex}`]} 
                     />
-                    {/*@ts-ignore */}
+                    { /* @ts-ignore */}
                      <Select label={
                             <span className="flex items-center">
                                 Answer Association Type
@@ -509,7 +515,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
                                 <Input label="Score Value" type="number" step="any" value={fb.score_value} onChange={e => updateQcaFeedbackItem(qcaIndex, fbIndex, 'score_value', e.target.value)} disabled={isSubmitting} containerClassName="mb-0"/>
                                 <Select label="Comparison" options={comparisonOptions} value={fb.comparison} onChange={e => updateQcaFeedbackItem(qcaIndex, fbIndex, 'comparison', e.target.value as FeedbackComparisonEnumFE)} disabled={isSubmitting} containerClassName="mb-0"/>
-                                <Button type="button" variant="danger" size="xs" onClick={() => removeQcaFeedbackItem(qcaIndex, fbIndex)} disabled={isSubmitting} className="self-end mb-0">Remove</Button>
+                                <Button type="button" variant="danger" size="md" onClick={() => removeQcaFeedbackItem(qcaIndex, fbIndex)} disabled={isSubmitting} className="self-center mb-0">Remove</Button>
                             </div>
                             <Textarea label="Feedback Text" value={fb.feedback} onChange={e => updateQcaFeedbackItem(qcaIndex, fbIndex, 'feedback', e.target.value)} rows={1} disabled={isSubmitting} containerClassName="mb-0"/>
                         </div>
