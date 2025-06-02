@@ -5,7 +5,6 @@ import surveyAttemptService from '../services/surveyAttemptService';
 import surveyService from '../services/surveyService'; 
 import type { SurveyAttemptResultFE } from '../types/surveyAttemptTypes';
 import type { SurveyFE } from '../types/surveyTypes'; 
-// import type { Course } from '../types/courseTypes'; // No longer directly needed here
 import { useNotifier } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import CourseResultCard from '../components/results/CourseResultCard';
@@ -47,7 +46,7 @@ const SurveyResultsPage: React.FC = () => {
           setSurveyDetails(surveyData);
           
           if (surveyData.course_ids && surveyData.course_ids.length > 0) {
-            const allCourses = await courseService.listCourses(); // Fetch all courses once
+            const allCourses = await courseService.listCourses();
             const cNameMap: Record<string, string> = {};
             surveyData.course_ids.forEach(cId => {
                 const foundCourse = allCourses.find(rc => rc.id === cId);
@@ -69,13 +68,12 @@ const SurveyResultsPage: React.FC = () => {
     fetchResultsAndDetails();
   }, [attemptId, user, authLoading, addNotification]);
 
-  const overallActualScore = results 
-    ? Object.values(results.course_scores).reduce((sum, score) => sum + score, 0) 
-    : 0;
+  // MODIFIED: Use the new actual_overall_survey_score from results
+  const overallActualScore = results?.actual_overall_survey_score ?? 0;
   
   const overallMaxScore = results?.max_overall_survey_score;
   
-  const overallPercentageScore = (overallMaxScore !== undefined && overallMaxScore !== null && overallMaxScore > 0)
+  const overallPercentageScore = (overallMaxScore !== undefined && overallMaxScore !== null && overallMaxScore > 0 && overallActualScore !== null)
     ? (overallActualScore / overallMaxScore) * 100
     : null;
 
@@ -112,13 +110,15 @@ const SurveyResultsPage: React.FC = () => {
         <div className="bg-gray-100 p-4 rounded-lg mb-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-2 flex items-center">
             Overall Survey Performance
-            <Tooltip text="This is the sum of your scores across all courses in this survey, compared to the total maximum possible score for the entire survey.">
+            <Tooltip text="This score reflects your performance across all unique questions in the survey.">
                 <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-2 cursor-pointer" />
             </Tooltip>
           </h2>
           <div className="flex items-baseline space-x-2">
             <span className="text-gray-700 font-medium">Total Score:</span>
-            <span className="text-3xl font-bold text-indigo-600">{overallActualScore.toFixed(1)}</span>
+            <span className="text-3xl font-bold text-indigo-600">
+              {(overallActualScore !== null ? overallActualScore.toFixed(1) : 'N/A')}
+            </span>
             {(overallMaxScore !== undefined && overallMaxScore !== null) && <span className="text-md text-gray-500"> / {overallMaxScore.toFixed(1)}</span>}
             {overallPercentageScore !== null && (
               <span className="text-2xl font-bold text-green-600 bg-green-100 px-3 py-1 rounded-md">
@@ -128,7 +128,7 @@ const SurveyResultsPage: React.FC = () => {
           </div>
            <p className="text-xs text-gray-500 mt-2 flex items-center">
             <InformationCircleIcon className="h-4 w-4 mr-1 text-gray-400" />
-            Note: Individual question scores are standardized (0-10 points) before summing into course/overall totals.
+            Note: Individual question scores are standardized (0-10 points) before summing into course totals or the overall unique question total.
           </p>
         </div>
 

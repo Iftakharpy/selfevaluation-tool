@@ -267,7 +267,7 @@ const QuestionsPage: React.FC = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editingQuestion?.id ? 'Edit Question' : 'Create New Question'}
-        size="3xl" 
+        size="4xl" 
       >
         {isModalLoading && <div className="text-center p-4">Loading question data...</div>}
         {!isModalLoading && isModalOpen && (

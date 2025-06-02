@@ -44,15 +44,15 @@ interface SurveyAttemptBaseFE {
   course_outcome_categorization: Record<string, OutcomeCategoryEnumFE>; // course_id (string) -> outcome
   max_scores_per_course?: Record<string, number> | null;
   max_overall_survey_score?: number | null;
-  survey_title?: string | null; // Changed to allow null
-  survey_description?: string | null; // ADDED FIELD
+  actual_overall_survey_score?: number | null; // NEW FIELD
+  survey_title?: string | null; 
+  survey_description?: string | null;
 }
 
 // For listing user's attempts (student view) or attempts for a survey (teacher view)
 // Corresponds to backend's SurveyAttemptOut (without answers by default)
 export interface SurveyAttemptListItemFE extends SurveyAttemptBaseFE {
   id: string;
-  // survey_title and survey_description are inherited from SurveyAttemptBaseFE
   student_display_name?: string; 
 }
 
@@ -62,5 +62,4 @@ export interface SurveyAttemptResultFE extends SurveyAttemptBaseFE {
   id: string;
   answers: StudentAnswerFE[];
   student_display_name?: string; 
-  // survey_title and survey_description are inherited from SurveyAttemptBaseFE
 }

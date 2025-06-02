@@ -43,28 +43,26 @@ def _prepare_student_answer_dict_for_out(answer_dict_from_db: dict) -> dict:
     return answer_dict_from_db
 
 def _prepare_survey_attempt_dict_for_out(attempt_dict_from_db: dict) -> dict: 
-    # Removed survey_title from params as it's now part of attempt_dict_from_db if populated
     if "_id" in attempt_dict_from_db:
         attempt_dict_from_db["id"] = str(attempt_dict_from_db.pop("_id"))
     for field in ["student_id", "survey_id"]:
         if field in attempt_dict_from_db and isinstance(attempt_dict_from_db[field], ObjectId):
             attempt_dict_from_db[field] = str(attempt_dict_from_db[field])
     
-    # Ensure default empty dicts for these if they are None from DB
     for key in ["course_outcome_categorization", "max_scores_per_course", "course_feedback", "detailed_feedback"]:
         if attempt_dict_from_db.get(key) is None:
             attempt_dict_from_db[key] = {}
             
     if "max_overall_survey_score" not in attempt_dict_from_db: 
          attempt_dict_from_db["max_overall_survey_score"] = None
+    if "actual_overall_survey_score" not in attempt_dict_from_db: # For the new field
+         attempt_dict_from_db["actual_overall_survey_score"] = None
     if "student_display_name" not in attempt_dict_from_db:
         attempt_dict_from_db["student_display_name"] = None
-    if "survey_title" not in attempt_dict_from_db: # Ensure these new fields have defaults if not populated
+    if "survey_title" not in attempt_dict_from_db: 
         attempt_dict_from_db["survey_title"] = None
     if "survey_description" not in attempt_dict_from_db:
         attempt_dict_from_db["survey_description"] = None
-
-
     return attempt_dict_from_db
 
 async def calculate_score_for_answer(question_dict: Dict, student_answer_value: Any) -> float:
@@ -238,20 +236,19 @@ async def generate_all_feedback_and_outcomes_for_attempt(
     return final_overall_course_feedback, detailed_feedback_per_course, overall_survey_feedback_str, final_course_outcome_categories
 
 async def _populate_attempt_response_data(attempt_dict: dict, survey_collection_ref, user_collection_ref, include_survey_details: bool = False) -> None:
-    """Populates max scores, student display name, and optionally survey title & description into the attempt dictionary."""
     survey_doc = await survey_collection_ref.find_one({"_id": attempt_dict["survey_id"]})
     if survey_doc:
         attempt_dict["max_scores_per_course"] = survey_doc.get("max_scores_per_course", {})
         attempt_dict["max_overall_survey_score"] = survey_doc.get("max_overall_survey_score")
-        if include_survey_details: # Changed parameter name for clarity
+        if include_survey_details:
             attempt_dict["survey_title"] = survey_doc.get("title")
-            attempt_dict["survey_description"] = survey_doc.get("description") # ADDED DESCRIPTION
+            attempt_dict["survey_description"] = survey_doc.get("description")
     else:
         attempt_dict["max_scores_per_course"] = {}
         attempt_dict["max_overall_survey_score"] = None
         if include_survey_details:
             attempt_dict["survey_title"] = "Unknown Survey"
-            attempt_dict["survey_description"] = None # ADDED DESCRIPTION
+            attempt_dict["survey_description"] = None
     
     if "student_id" in attempt_dict:
         student_doc = await user_collection_ref.find_one({"_id": attempt_dict["student_id"]})
@@ -281,7 +278,10 @@ async def start_survey_attempt(
     else:
         new_attempt_data_dict: Dict[str, Any] = {
             "student_id": current_user.id,
-            "survey_id": survey.id
+            "survey_id": survey.id,
+            # Populate max scores from survey object at the start of the attempt
+            "max_scores_per_course": survey.max_scores_per_course,
+            "max_overall_survey_score": survey.max_overall_survey_score
         }
         new_attempt_obj = SurveyAttemptInDB.model_validate(new_attempt_data_dict)
         try:
@@ -359,8 +359,8 @@ async def submit_survey_attempt(
 ):
     if not ObjectId.is_valid(attempt_id): raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid attempt ID format.")
     attempt_collection = get_survey_attempt_collection(); answer_collection = get_student_answer_collection()
-    survey_collection_ref = get_survey_collection(); qca_collection = get_qca_collection() # Use ref
-    question_collection = get_question_collection(); user_collection_ref = get_user_collection() # Use ref
+    survey_collection_ref = get_survey_collection(); qca_collection = get_qca_collection()
+    question_collection = get_question_collection(); user_collection_ref = get_user_collection()
     attempt_obj_id = PyObjectId(attempt_id)
     attempt_dict = await attempt_collection.find_one({"_id": attempt_obj_id, "student_id": current_user.id})
     if not attempt_dict: raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey attempt not found or not yours.")
@@ -371,6 +371,10 @@ async def submit_survey_attempt(
     answers_cursor = answer_collection.find({"survey_attempt_id": attempt_obj_id})
     answers_with_scores: List[Dict[str,Any]] = []
     calculated_course_scores: Dict[str, float] = {str(cid): 0.0 for cid in survey_obj.course_ids}
+    
+    # For calculating actual_overall_survey_score based on unique questions
+    unique_question_scores_for_overall: Dict[PyObjectId, float] = {}
+
     async for ans_raw in answers_cursor:
         ans = ans_raw.copy()
         qca = await qca_collection.find_one({"_id": ans["qca_id"]})
@@ -379,20 +383,39 @@ async def submit_survey_attempt(
         score = await calculate_score_for_answer(q_doc, ans["answer_value"])
         await answer_collection.update_one({"_id": ans["_id"]}, {"$set": {"score_achieved": score}})
         ans["score_achieved"] = score; answers_with_scores.append(ans)
+        
+        # Accumulate course scores
         course_id_str = str(qca["course_id"])
         score_contrib = score * -1 if qca.get("answer_association_type") == AnswerAssociationTypeEnum.negative.value else score
         if course_id_str in calculated_course_scores: calculated_course_scores[course_id_str] += score_contrib
+
+        # Store score for unique question ID for overall calculation
+        # If a question is somehow answered multiple times (e.g. bad data, or complex survey logic not yet implemented),
+        # this takes the latest processed score for that question.
+        unique_question_scores_for_overall[qca["question_id"]] = score # qca["question_id"] is PyObjectId
+
+    actual_overall_survey_score = sum(unique_question_scores_for_overall.values())
     
     attempt_for_feedback = attempt_dict.copy(); attempt_for_feedback["course_scores"] = calculated_course_scores
     course_fb, detailed_fb, overall_fb, outcomes = await generate_all_feedback_and_outcomes_for_attempt(attempt_for_feedback, survey_obj, answers_with_scores, qca_collection, question_collection)
-    update_payload = {"is_submitted": True, "submitted_at": datetime.now(UTC), "course_scores": calculated_course_scores, "course_feedback": course_fb, "detailed_feedback": detailed_fb, "overall_survey_feedback": overall_fb, "course_outcome_categorization": outcomes}
+    
+    update_payload = {
+        "is_submitted": True, 
+        "submitted_at": datetime.now(UTC), 
+        "course_scores": calculated_course_scores, 
+        "actual_overall_survey_score": actual_overall_survey_score, # ADDED
+        "course_feedback": course_fb, 
+        "detailed_feedback": detailed_fb, 
+        "overall_survey_feedback": overall_fb, 
+        "course_outcome_categorization": outcomes
+    }
     await attempt_collection.update_one({"_id": attempt_obj_id}, {"$set": update_payload})
     updated_attempt = await attempt_collection.find_one({"_id": attempt_obj_id})
     if not updated_attempt: raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve attempt post-submission.")
     
     await _populate_attempt_response_data(updated_attempt, survey_collection_ref, user_collection_ref, include_survey_details=True) 
     
-    result_out = SurveyAttemptResultOut.model_validate(_prepare_survey_attempt_dict_for_out(updated_attempt.copy())) # Pass updated_attempt directly
+    result_out = SurveyAttemptResultOut.model_validate(_prepare_survey_attempt_dict_for_out(updated_attempt.copy()))
     result_out.answers = [StudentAnswerOut.model_validate(_prepare_student_answer_dict_for_out(a.copy())) for a in answers_with_scores]
     return result_out
 
@@ -418,7 +441,7 @@ async def get_survey_attempt_results(
     
     answers_list = await answer_collection.find({"survey_attempt_id": PyObjectId(attempt_id)}).to_list(length=None)
     
-    result_out = SurveyAttemptResultOut.model_validate(_prepare_survey_attempt_dict_for_out(attempt_dict)) # Pass attempt_dict directly
+    result_out = SurveyAttemptResultOut.model_validate(_prepare_survey_attempt_dict_for_out(attempt_dict))
     result_out.answers = [StudentAnswerOut.model_validate(_prepare_student_answer_dict_for_out(a.copy())) for a in answers_list]
     return result_out
 
@@ -433,8 +456,8 @@ async def list_my_survey_attempts(
     output_list = []
     for attempt_raw in attempts_list_raw:
         attempt_db = attempt_raw.copy()
-        await _populate_attempt_response_data(attempt_db, survey_coll_ref, user_coll_ref, include_survey_details=True) # Changed to include_survey_details
-        attempt_out = SurveyAttemptOut.model_validate(_prepare_survey_attempt_dict_for_out(attempt_db)) # Pass attempt_db directly
+        await _populate_attempt_response_data(attempt_db, survey_coll_ref, user_coll_ref, include_survey_details=True)
+        attempt_out = SurveyAttemptOut.model_validate(_prepare_survey_attempt_dict_for_out(attempt_db))
         
         if include_answers and attempt_out.is_submitted:
             answers_raw = await ans_coll.find({"survey_attempt_id": PyObjectId(attempt_out.id)}).to_list(length=None)
@@ -455,7 +478,7 @@ async def list_attempts_for_survey(
     if survey_doc_ref["created_by"] != current_user.id: raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized.")
     
     survey_title_for_attempts = survey_doc_ref.get("title") 
-    survey_description_for_attempts = survey_doc_ref.get("description") # Get description
+    survey_description_for_attempts = survey_doc_ref.get("description")
 
     attempts_cursor = attempt_coll.find({"survey_id": survey_obj_id, "is_submitted": True}).skip(skip).limit(limit).sort("submitted_at", -1)
     attempts_list_raw = await attempts_cursor.to_list(length=limit)
@@ -463,7 +486,6 @@ async def list_attempts_for_survey(
     for attempt_raw in attempts_list_raw:
         attempt_db = attempt_raw.copy()
         await _populate_attempt_response_data(attempt_db, survey_coll, user_coll_ref) 
-        # Manually add survey_title and description if not already done by _populate (though it could be)
         attempt_db["survey_title"] = survey_title_for_attempts 
         attempt_db["survey_description"] = survey_description_for_attempts
         
