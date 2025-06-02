@@ -1,9 +1,11 @@
+// File: ui/src/components/results/CourseResultCard.tsx
 import React from 'react';
 import { OutcomeCategoryEnumFE } from '../../types/surveyTypes';
 
 interface CourseResultCardProps {
-  courseName: string; // You'll need to fetch/pass this
+  courseName: string;
   score: number;
+  maxScore?: number | null; // ADDED: Max possible score for this course in this survey
   overallFeedback?: string | null;
   detailedFeedbackItems?: string[] | null;
   outcome?: OutcomeCategoryEnumFE | null;
@@ -26,18 +28,30 @@ const getOutcomeStyling = (outcome?: OutcomeCategoryEnumFE | null) => {
 const CourseResultCard: React.FC<CourseResultCardProps> = ({
   courseName,
   score,
+  maxScore, // Destructure new prop
   overallFeedback,
   detailedFeedbackItems,
   outcome,
 }) => {
   const outcomeStyle = getOutcomeStyling(outcome);
+  const percentageScore = (maxScore !== undefined && maxScore !== null && maxScore > 0) 
+    ? ((score / maxScore) * 100) 
+    : null;
 
   return (
     <div className="bg-white shadow-md rounded-lg p-6 mb-6">
       <h4 className="text-xl font-semibold text-indigo-600 mb-2">{courseName}</h4>
-      <div className="mb-3">
-        <span className="text-gray-700 font-medium">Your Score: </span>
-        <span className="text-2xl font-bold text-indigo-500">{score.toFixed(1)}</span>
+      <div className="mb-3 flex items-baseline space-x-2">
+        <div>
+          <span className="text-gray-700 font-medium">Your Score: </span>
+          <span className="text-2xl font-bold text-indigo-500">{score.toFixed(1)}</span>
+          {(maxScore !== undefined && maxScore !== null) && <span className="text-sm text-gray-500"> / {maxScore.toFixed(1)}</span>}
+        </div>
+        {percentageScore !== null && (
+          <div className="text-lg font-semibold text-green-600 bg-green-100 px-2 py-1 rounded">
+            ({percentageScore.toFixed(0)}%)
+          </div>
+        )}
       </div>
 
       {outcome && (

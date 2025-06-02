@@ -19,7 +19,8 @@ import MyAttemptsPage from './pages/MyAttemptsPage';
 import SurveyResultsPage from './pages/SurveyResultsPage';
 import CoursesPage from './pages/CoursesPage';
 import QuestionsPage from './pages/QuestionsPage';
-import SurveyManagementPage from './pages/SurveyManagementPage'; // ADDED
+import SurveyManagementPage from './pages/SurveyManagementPage';
+import SurveyAttemptsOverviewPage from './pages/SurveyAttemptsOverviewPage'; // ENSURED IMPORT
 
 
 function App() {
@@ -77,10 +78,18 @@ function App() {
           element={<ProtectedRoute allowedRoles={['teacher']}><QuestionsPage /></ProtectedRoute>} 
         />
         <Route 
-          path="/surveys/manage" // ADDED THIS ROUTE
+          path="/surveys/manage"
           element={
             <ProtectedRoute allowedRoles={['teacher']}>
               <SurveyManagementPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/surveys/:surveyId/attempts-overview" // ENSURED THIS ROUTE IS CORRECT
+          element={
+            <ProtectedRoute allowedRoles={['teacher']}>
+              <SurveyAttemptsOverviewPage />
             </ProtectedRoute>
           } 
         />
