@@ -10,9 +10,8 @@ from app.core.db import (
     get_course_collection, 
     get_qca_collection, 
     get_question_collection,
-    # These are not directly used in this router but kept for context from previous versions
-    # get_survey_attempt_collection, 
-    # get_student_answer_collection 
+    get_survey_attempt_collection, # ADDED IMPORT
+    get_student_answer_collection  # ADDED IMPORT
 )
 from app.users.auth import require_teacher_role, get_current_active_user
 from app.users.data_types import UserInDB, PyObjectId, RoleEnum
@@ -318,6 +317,7 @@ async def delete_survey(
     if delete_result.deleted_count == 0: 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found or already deleted unexpectedly.")
     
+    # Clean up associated attempts and their answers if the survey is deleted
     student_answer_collection = get_student_answer_collection()
     attempts_to_delete_cursor = attempt_collection.find({"survey_id": survey_obj_id}) 
     async for attempt in attempts_to_delete_cursor:

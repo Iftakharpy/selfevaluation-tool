@@ -31,6 +31,7 @@ The purpose of this web application is to provide a pre-assessment tool for stud
 - Teachers can create/edit surveys, add questions, and map them to courses/skills.
 - Questions can be multiple-choice, input, or range.
 - Questions can be randomized or dynamically shown based on previous answers.
+- Teachers should have the ability to copy survey link and shared to students
 
 ### 2.3 Assessment Flow
 - Students access the survey via a link in the program description (active during enrollment).

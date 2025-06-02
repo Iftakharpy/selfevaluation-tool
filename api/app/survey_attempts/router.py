@@ -1,6 +1,6 @@
 # api/app/survey_attempts/router.py
 from fastapi import APIRouter, HTTPException, status, Depends, Query
-from typing import List, Optional, Dict, Any, Tuple 
+from typing import List, Optional, Dict, Any, Tuple, Union # Added Union
 from bson import ObjectId
 from datetime import datetime, UTC 
 
@@ -77,10 +77,16 @@ async def calculate_score_for_answer(question_dict: Dict, student_answer_value: 
     if q_type == AnswerTypeEnum.multiple_choice:
         correct_key = rules.get("correct_option_key")
         option_scores = rules.get("option_scores")
+        # MODIFIED BLOCK START
+        score_if_correct = rules.get("score_if_correct", STANDARD_QUESTION_MAX_SCORE)
+        score_if_incorrect = rules.get("score_if_incorrect", 0.0) # Or another default if specified
+        # MODIFIED BLOCK END
+
         if option_scores and isinstance(option_scores, dict) and student_answer_value in option_scores:
             raw_score = float(option_scores[student_answer_value])
         elif correct_key is not None:
-            raw_score = STANDARD_QUESTION_MAX_SCORE if correct_key == student_answer_value else 0.0
+            # MODIFIED LINE
+            raw_score = float(score_if_correct) if correct_key == student_answer_value else float(score_if_incorrect)
     
     elif q_type == AnswerTypeEnum.multiple_select:
         if not isinstance(student_answer_value, list): return 0.0
@@ -98,7 +104,7 @@ async def calculate_score_for_answer(question_dict: Dict, student_answer_value: 
             penalty_val = float(rules.get("penalty_per_incorrect", 0.0))
             for key in selected_keys:
                 if key in correct_option_keys: current_raw_score += score_val
-                elif key in options: current_raw_score += penalty_val
+                elif key in options: current_raw_score += penalty_val # Penalty only for selecting defined incorrect options
         raw_score = current_raw_score
     
     elif q_type == AnswerTypeEnum.input:
