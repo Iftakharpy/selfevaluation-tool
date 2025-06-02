@@ -10,8 +10,8 @@ from app.core.db import (
     get_user_collection, get_course_collection, 
     get_question_collection, get_qca_collection,
     get_survey_collection, 
-    get_survey_attempt_collection, # ADD THIS
-    get_student_answer_collection  # ADD THIS
+    get_survey_attempt_collection,
+    get_student_answer_collection
 )
 from app.core.settings import DATABASE_NAME, MONGO_DATABASE_URL
 
@@ -20,14 +20,25 @@ def database_warning_and_final_cleanup():
     if "test" not in MONGO_DATABASE_URL.lower() and "test" not in DATABASE_NAME.lower():
         print(f"\nCRITICAL WARNING: Running tests against a non-test database ({DATABASE_NAME} at {MONGO_DATABASE_URL}).")
     yield
-    if MONGO_DB.client and hasattr(MONGO_DB.client, '_loop') and MONGO_DB.client._loop:
+    # Ensure MONGO_DB.client and its loop exist and the loop is not closed before trying to close connection
+    if MONGO_DB.client and hasattr(MONGO_DB.client, '_loop') and MONGO_DB.client._loop and not MONGO_DB.client._loop.is_closed():
         client_loop = MONGO_DB.client._loop
-        if not client_loop.is_closed():
+        # Check if the loop is running, as run_coroutine_threadsafe needs a running loop
+        if client_loop.is_running():
             future = asyncio.run_coroutine_threadsafe(close_mongo_connection(), client_loop)
             try:
                 future.result(timeout=5)
             except Exception as e:
                 print(f"--- Error during final close_mongo_connection: {e} ---")
+        else:
+            # If the loop is not running, try running close_mongo_connection directly (less ideal but a fallback)
+            try:
+                client_loop.run_until_complete(close_mongo_connection())
+            except Exception as e:
+                 print(f"--- Error during final close_mongo_connection (loop not running): {e} ---")
+    elif MONGO_DB.client:
+        print("--- Warning: MONGO_DB.client exists but its event loop is not available or closed. Cannot run async close_mongo_connection. ---")
+
 
 @pytest.fixture(scope="session")
 def client(database_warning_and_final_cleanup) -> Generator[TestClient, None, None]:
@@ -75,45 +86,50 @@ def authenticated_teacher_data_and_client(client: TestClient) -> tuple[TestClien
     return client, created_user_details
 
 @pytest.fixture(scope="function", autouse=True)
-def auto_db_cleanup(client: TestClient): 
+def auto_db_cleanup(client: TestClient): # client fixture implicitly handles app lifespan and db connection
+    # This fixture will run after each test function due to autouse=True
+    # It relies on MONGO_DB.db being set up by the TestClient's app lifespan
+    
+    # Yield to let the test run
+    yield
+
+    # Cleanup after the test
     if MONGO_DB.db is not None and MONGO_DB.client is not None and hasattr(MONGO_DB.client, '_loop'):
         db_client_loop = MONGO_DB.client._loop
         if db_client_loop is None or db_client_loop.is_closed():
-            print("Warning: auto_db_cleanup: MONGO_DB.client's event loop is None or closed. Skipping cleanup.")
-            yield
+            # print("Warning: auto_db_cleanup: MONGO_DB.client's event loop is None or closed post-test. Skipping cleanup.")
             return
 
         async def clean_collections_async():
-            user_coll = get_user_collection()
-            course_coll = get_course_collection()
-            question_coll = get_question_collection()
-            qca_coll = get_qca_collection()
-            survey_coll = get_survey_collection() 
-            attempt_coll = get_survey_attempt_collection() # ADD THIS
-            answer_coll = get_student_answer_collection() # ADD THIS
-            
-            if user_coll is not None: await user_coll.delete_many({})
-            if course_coll is not None: await course_coll.delete_many({})
-            if question_coll is not None: await question_coll.delete_many({})
-            if qca_coll is not None: await qca_coll.delete_many({})
-            if survey_coll is not None: await survey_coll.delete_many({})
-            if attempt_coll is not None: await attempt_coll.delete_many({}) # ADD THIS
-            if answer_coll is not None: await answer_coll.delete_many({}) # ADD THIS
+            # print(f"--- conftest (auto_db_cleanup): Cleaning collections for test ---")
+            collections_to_clean_funcs = [
+                get_user_collection, get_course_collection,
+                get_question_collection, get_qca_collection,
+                get_survey_collection, get_survey_attempt_collection,
+                get_student_answer_collection
+            ]
+            for coll_func in collections_to_clean_funcs:
+                try:
+                    coll = coll_func()
+                    if coll is not None:
+                        await coll.delete_many({})
+                except Exception as e:
+                    print(f"--- conftest: Error cleaning collection via {coll_func.__name__} in auto_db_cleanup: {e} ---")
+            # print(f"--- conftest (auto_db_cleanup): Collections cleaned ---")
         
         if db_client_loop.is_running():
             future = asyncio.run_coroutine_threadsafe(clean_collections_async(), db_client_loop)
             try:
                 future.result(timeout=10)
             except Exception as e:
-                print(f"Error during db_cleanup (threadsafe): {e}") 
+                print(f"Error during auto_db_cleanup (threadsafe): {e}") 
         else:
+            # This case might be problematic if the loop from TestClient isn't easily reused.
+            # However, for cleanup, a new temporary loop might be acceptable if the main one is truly gone.
+            # print("Warning: auto_db_cleanup: MONGO_DB.client's event loop is not running. Attempting cleanup with new loop.")
             try:
-                asyncio.set_event_loop(db_client_loop) 
-                db_client_loop.run_until_complete(clean_collections_async())
-            except RuntimeError as e: 
-                print(f"Error setting/running event loop in db_cleanup (loop not running case - RuntimeError): {e}")
+                asyncio.run(clean_collections_async()) # Fallback to asyncio.run
             except Exception as e:
-               print(f"General error during db_cleanup (loop not running case): {e}")
+               print(f"General error during auto_db_cleanup (loop not running case, using asyncio.run): {e}")
     elif MONGO_DB.db is None:
-        print("Warning: auto_db_cleanup: MONGO_DB.db is None. App may not have started correctly. Skipping cleanup.")
-    yield
+        print("Warning: auto_db_cleanup: MONGO_DB.db is None post-test. App may not have initialized DB correctly. Skipping cleanup.")

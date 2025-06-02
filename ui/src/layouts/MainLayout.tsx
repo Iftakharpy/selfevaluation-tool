@@ -16,9 +16,14 @@ const MainLayout: React.FC = () => {
               <>
                 <span className="hidden sm:inline">Hello, {user.display_name} ({user.role})</span>
                 {user.role === 'teacher' && (
-                  <Link to="/dashboard" className="hover:text-gray-300 transition-colors">Dashboard</Link>
+                  <>
+                    <Link to="/dashboard" className="hover:text-gray-300 transition-colors">Dashboard</Link>
+                    <Link to="/surveys/manage" className="hover:text-gray-300 transition-colors">My Surveys</Link> 
+                  </>
                 )}
-                 <Link to="/surveys" className="hover:text-gray-300 transition-colors">Surveys</Link>
+                 {user.role === 'student' && (
+                    <Link to="/surveys" className="hover:text-gray-300 transition-colors">Available Surveys</Link>
+                 )}
                 {user.role === 'student' && (
                     <Link to="/my-attempts" className="hover:text-gray-300 transition-colors">My Attempts</Link>
                 )}

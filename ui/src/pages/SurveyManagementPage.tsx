@@ -14,12 +14,13 @@ import SurveyForm from '../components/forms/SurveyForm';
 
 const SurveyManagementPage: React.FC = () => {
   const [mySurveys, setMySurveys] = useState<SurveySummaryListItemFE[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingTable, setIsLoadingTable] = useState(true); // Renamed for clarity
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   
   const [editingSurvey, setEditingSurvey] = useState<SurveyFE | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false); // Renamed for clarity
+  const [isModalLoading, setIsModalLoading] = useState(false); // New state for modal data loading
   const [formError, setFormError] = useState<string | null>(null);
   
   const { addNotification } = useNotifier();
@@ -29,20 +30,14 @@ const SurveyManagementPage: React.FC = () => {
 
   const fetchMySurveys = useCallback(async () => {
     if (!user) return;
-    setIsLoading(true);
+    setIsLoadingTable(true);
     try {
-      // Assuming listAllSurveysForTeacher returns surveys created by the current teacher
-      // or all surveys if general teacher access is intended.
-      // The current logic filters client-side if needed, or relies on backend filtering.
       const allSurveys = await surveyService.listAllSurveysForTeacher();
-      // If backend doesn't filter by created_by, you might need to filter here:
-      // const filteredSurveys = allSurveys.filter(survey => survey.created_by === user.id);
-      // setMySurveys(filteredSurveys);
-      setMySurveys(allSurveys.filter(survey => survey.created_by === user.id)); // Ensure only my surveys are shown
+      setMySurveys(allSurveys.filter(survey => survey.created_by === user.id)); 
     } catch (error: any) {
       addNotification(error.message || 'Failed to fetch surveys', 'error');
     } finally {
-      setIsLoading(false);
+      setIsLoadingTable(false);
     }
   }, [addNotification, user]);
 
@@ -57,26 +52,25 @@ const SurveyManagementPage: React.FC = () => {
   };
 
   const handleOpenEditModal = async (surveyItem: SurveySummaryListItemFE) => {
-    setIsLoading(true); 
+    setIsModalLoading(true); // Use modal-specific loading state
     setFormError(null);
+    setEditingSurvey(null); // Clear previous editing survey first
     try {
         const fullSurveyData = await surveyService.getSurveyDetail(surveyItem.id);
         setEditingSurvey(fullSurveyData);
         setIsModalOpen(true);
     } catch (error: any) {
         addNotification(error.message || 'Failed to fetch survey details for editing.', 'error');
+        setIsModalOpen(false); // Don't open modal if data fetch fails
     } finally {
-        // Only set loading to false specific to modal data, not table loading
-        // If you have a separate state for modal loading, use that.
-        // For now, assuming this doesn't interfere with table's isLoading
+        setIsModalLoading(false); 
     }
   };
 
   const handleOpenDeleteModal = (surveyItem: SurveySummaryListItemFE) => {
-    // We only need id and title for the confirmation modal for SurveyFE type
     const surveyForDelete: SurveyFE = { 
         ...surveyItem, 
-        questions: [], // Add default/empty for fields not in SurveySummaryListItemFE
+        questions: [], 
         course_skill_total_score_thresholds: {},
         course_outcome_thresholds: {}
     };
@@ -88,6 +82,7 @@ const SurveyManagementPage: React.FC = () => {
     setIsModalOpen(false);
     setEditingSurvey(null);
     setFormError(null);
+    // No need to touch isLoadingTable here
   };
   
   const handleCloseDeleteModal = () => {
@@ -96,7 +91,7 @@ const SurveyManagementPage: React.FC = () => {
   };
 
   const handleSubmitSurvey = async (data: SurveyCreateFE | SurveyUpdateFE) => {
-    setIsSubmitting(true);
+    setIsSubmittingForm(true);
     setFormError(null);
     try {
       if (editingSurvey && editingSurvey.id) {
@@ -113,13 +108,13 @@ const SurveyManagementPage: React.FC = () => {
       setFormError(msg); 
       addNotification(msg, 'error'); 
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingForm(false);
     }
   };
 
   const handleDeleteSurvey = async () => {
     if (!editingSurvey || !editingSurvey.id) return;
-    setIsSubmitting(true);
+    setIsSubmittingForm(true); // Use form submitting state for this action too
     try {
       await surveyService.deleteSurvey(editingSurvey.id);
       addNotification('Survey deleted successfully!', 'success');
@@ -128,12 +123,14 @@ const SurveyManagementPage: React.FC = () => {
     } catch (error: any) {
       addNotification(error.response?.data?.detail || 'Failed to delete survey.', 'error');
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingForm(false);
     }
   };
 
   const handleTogglePublish = async (survey: SurveySummaryListItemFE) => {
-    setIsSubmitting(true);
+    // Use a more specific loading state if many buttons can trigger loading
+    // For now, reusing isSubmittingForm might be acceptable if actions are modal
+    setIsSubmittingForm(true); 
     try {
       const updateData: SurveyUpdateFE = { is_published: !survey.is_published };
       await surveyService.updateSurvey(survey.id, updateData);
@@ -142,7 +139,7 @@ const SurveyManagementPage: React.FC = () => {
     } catch (error: any) {
       addNotification(error.response?.data?.detail || 'Failed to toggle publish status.', 'error');
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingForm(false);
     }
   };
 
@@ -181,18 +178,17 @@ const SurveyManagementPage: React.FC = () => {
       header: 'Manage',
       accessor: (item) => (
         <div className="space-x-1 whitespace-nowrap">
-          <Button size="xs" variant="ghost" onClick={() => handleOpenEditModal(item)} disabled={isSubmitting || isLoading}>Edit</Button>
-          <Button size="xs" variant="ghost" onClick={() => handleTogglePublish(item)} disabled={isSubmitting || isLoading}>
+          <Button size="xs" variant="ghost" onClick={() => handleOpenEditModal(item)} disabled={isSubmittingForm || isLoadingTable || isModalLoading}>Edit</Button>
+          <Button size="xs" variant="ghost" onClick={() => handleTogglePublish(item)} disabled={isSubmittingForm || isLoadingTable || isModalLoading}>
             {item.is_published ? 'Unpublish' : 'Publish'}
           </Button>
-          <Button size="xs" variant="ghost" onClick={() => navigate(`/surveys/${item.id}/attempts-overview`)} disabled={isSubmitting || isLoading}>
+           <Button size="xs" variant="ghost" onClick={() => navigate(`/surveys/${item.id}/attempts-overview`)} disabled={isSubmittingForm || isLoadingTable || isModalLoading}>
             Attempts
           </Button>
-          {/* ADDED COPY LINK BUTTON */}
-          <Button size="xs" variant="ghost" onClick={() => handleCopyLink(item.id)} disabled={isLoading}>
+          <Button size="xs" variant="ghost" onClick={() => handleCopyLink(item.id)} disabled={isLoadingTable || isModalLoading}>
             Copy Link
           </Button>
-          <Button size="xs" variant="danger" onClick={() => handleOpenDeleteModal(item)} disabled={isSubmitting || isLoading}>Delete</Button>
+          <Button size="xs" variant="danger" onClick={() => handleOpenDeleteModal(item)} disabled={isSubmittingForm || isLoadingTable || isModalLoading}>Delete</Button>
         </div>
       )
     }
@@ -202,7 +198,7 @@ const SurveyManagementPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Manage Your Surveys</h1>
-        <Button onClick={handleOpenCreateModal} variant="primary" disabled={isLoading}>
+        <Button onClick={handleOpenCreateModal} variant="primary" disabled={isLoadingTable || isModalLoading}>
           Create New Survey
         </Button>
       </div>
@@ -210,8 +206,7 @@ const SurveyManagementPage: React.FC = () => {
       <ResourceTable<SurveySummaryListItemFE>
         data={mySurveys}
         columns={columns}
-        isLoading={isLoading}
-        // onEdit, onDelete are handled by the custom accessor column now
+        isLoading={isLoadingTable} // Use dedicated table loading state
       />
 
       <Modal
@@ -219,12 +214,13 @@ const SurveyManagementPage: React.FC = () => {
         onClose={handleCloseModal}
         title={editingSurvey ? 'Edit Survey' : 'Create New Survey'}
       >
-        {isModalOpen && ( 
+        {isModalLoading && <div className="text-center p-4">Loading survey data...</div>}
+        {!isModalLoading && isModalOpen && ( 
             <SurveyForm
               initialData={editingSurvey}
               onSubmit={handleSubmitSurvey}
               onCancel={handleCloseModal}
-              isSubmitting={isSubmitting}
+              isSubmitting={isSubmittingForm}
               submitError={formError}
             />
         )}
@@ -236,7 +232,7 @@ const SurveyManagementPage: React.FC = () => {
           onClose={handleCloseDeleteModal}
           onConfirm={handleDeleteSurvey}
           itemName={`survey "${editingSurvey.title}"`}
-          isLoading={isSubmitting}
+          isLoading={isSubmittingForm}
         />
       )}
     </div>
