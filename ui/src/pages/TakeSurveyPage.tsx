@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react'; // Added useRef
 import { useParams, useNavigate } from 'react-router-dom';
 import surveyAttemptService from '../services/surveyAttemptService';
 import surveyService from '../services/surveyService';
@@ -30,30 +30,33 @@ const TakeSurveyPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const initialized = useRef(false); // Added ref to track initialization
+
   // Fetch survey details and start/resume attempt
   useEffect(() => {
     if (!surveyId || !user) return;
+
+    // Prevent effect from running twice in StrictMode or due to other re-renders
+    if (initialized.current) return;
+    initialized.current = true;
 
     const initializeSurvey = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        // Fetch survey details first to show title, etc., while attempt is being started
         const surveyDetails = await surveyService.getSurveyDetail(surveyId);
         setSurvey(surveyDetails);
 
         const attemptData = await surveyAttemptService.startSurveyAttempt(surveyId);
         setAttemptId(attemptData.attempt_id);
-        setQuestions(attemptData.questions || []); // Ensure questions is an array
-        // TODO: Potentially load existing answers if resuming an attempt (not implemented in backend yet)
+        setQuestions(attemptData.questions || []); 
         
-        // Initialize answers state for all questions if not already set
         const initialAnswers: AnswersState = {};
         (attemptData.questions || []).forEach(q => {
             initialAnswers[q.qca_id] = {
                 qca_id: q.qca_id,
                 question_id: q.question_id,
-                answer_value: undefined, // Or a default based on type
+                answer_value: undefined, 
             };
         });
         setAnswers(initialAnswers);
@@ -62,18 +65,23 @@ const TakeSurveyPage: React.FC = () => {
         const msg = err.response?.data?.detail || "Failed to load survey or start attempt.";
         setError(msg);
         addNotification(msg, 'error');
-        navigate('/surveys'); // Redirect if survey can't be loaded
+        if (msg.includes("Published survey not found")) { // Be more specific for navigation
+             navigate('/surveys');
+        } else {
+            // For other errors, maybe a general error page or back
+            navigate(-1); 
+        }
       } finally {
         setIsLoading(false);
       }
     };
     initializeSurvey();
-  }, [surveyId, user, navigate, addNotification]);
+  }, [surveyId, user, navigate, addNotification]); // Dependencies are correct
 
   const handleAnswerChange = useCallback((
     questionId: string, 
     qcaId: string, 
-    courseId: string, // Not directly used in payload but good to have
+    _courseId: string, 
     answerValue: any
   ) => {
     setAnswers(prev => ({
@@ -94,7 +102,7 @@ const TakeSurveyPage: React.FC = () => {
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+      setCurrentQuestionIndex(prev => prev + 1);
     }
   };
 
@@ -103,7 +111,7 @@ const TakeSurveyPage: React.FC = () => {
       addNotification("Attempt ID is missing. Cannot submit.", 'error');
       return;
     }
-    if (Object.values(answers).some(ans => ans.answer_value === undefined || ans.answer_value === null || ans.answer_value === '')) {
+    if (Object.values(answers).some(ans => ans.answer_value === undefined || ans.answer_value === null || (typeof ans.answer_value === 'string' && ans.answer_value.trim() === ''))) {
       if (!window.confirm("You have unanswered questions. Are you sure you want to submit?")) {
         return;
       }
@@ -114,11 +122,6 @@ const TakeSurveyPage: React.FC = () => {
     try {
       const answersToSubmit = Object.values(answers).filter(ans => ans.answer_value !== undefined);
       if (answersToSubmit.length > 0) {
-        // It's good practice to ensure all answers are sent, even if some are "empty"
-        // The backend might handle "unanswered" if answer_value is null/undefined.
-        // For this example, we're sending only those with a value to match StudentAnswerPayloadFE requirements.
-        // However, the backend `submitSurveyAttempt` calculates scores based on saved answers in DB.
-        // So, we should ensure answers are saved before submitting.
         await surveyAttemptService.submitAnswers(attemptId, answersToSubmit);
       }
 
@@ -165,7 +168,7 @@ const TakeSurveyPage: React.FC = () => {
               question={currentQuestion}
               currentAnswer={answers[currentQcaId]?.answer_value}
               onAnswerChange={handleAnswerChange}
-              isSubmitted={isSubmitting} // Or a true 'isSubmitted' state if attempt is already submitted
+              isSubmitted={isSubmitting} 
             />
           )}
         </div>
