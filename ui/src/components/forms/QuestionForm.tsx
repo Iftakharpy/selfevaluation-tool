@@ -11,6 +11,8 @@ import Textarea from './TextArea';
 import Select from './Select';
 import Button from './Button';
 import { useNotifier } from '../../contexts/NotificationContext';
+import Tooltip from '../common/Tooltip'; 
+import { InformationCircleIcon } from '../icons/InformationCircleIcon'; 
 
 import courseService from '../../services/courseService';
 import qcaService from '../../services/qcaService';
@@ -116,8 +118,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
     setDefaultFeedbacks(initialData?.default_feedbacks_on_score || []);
     
     const populatedInitialQcas = initialQcas.map(qca => ({
-        ...qca, // Spread existing QCA data (id, course_id, etc.)
-        question_id: initialData?.id || qca.question_id, // Prioritize initialData ID if available, else QCA's
+        ...qca, 
+        question_id: initialData?.id || qca.question_id, 
         courseName: allCourses.find(c => c.id === qca.course_id)?.name || 'Unknown Course'
     }));
     setAssociatedQCAs(populatedInitialQcas);
@@ -147,7 +149,6 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
         if (!qca.course_id) {
             newFieldErrors[`qca_course_${index}`] = "Course must be selected for this association.";
         }
-        // Add more QCA specific validations if needed
     });
 
     setFieldErrors(newFieldErrors);
@@ -181,11 +182,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                 scoring_rules_payload.option_scores = optionScores;
             } else if (answerType === AnswerTypeEnumFE.MULTIPLE_CHOICE && correctKey) {
                 scoring_rules_payload.correct_option_key = correctKey;
-                scoring_rules_payload.score_if_correct = 10; // Default for simple MC
+                scoring_rules_payload.score_if_correct = 10; 
                 scoring_rules_payload.score_if_incorrect = 0;
             } else if (answerType === AnswerTypeEnumFE.MULTIPLE_SELECT && correctKeys.length > 0) {
                 scoring_rules_payload.correct_option_keys = correctKeys;
-                scoring_rules_payload.score_per_correct = correctKeys.length > 0 ? (10 / correctKeys.length) : 0; // Distribute 10 points
+                scoring_rules_payload.score_per_correct = correctKeys.length > 0 ? (10 / correctKeys.length) : 0; 
                 scoring_rules_payload.penalty_per_incorrect = 0;
             }
             break;
@@ -265,7 +266,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   const handleAddQCA = () => {
     setAssociatedQCAs(prev => [...prev, {
         course_id: '', 
-        question_id: initialData?.id || '', // This will be empty for new questions until saved
+        question_id: initialData?.id || '', 
         answer_association_type: 'positive' as AnswerAssociationTypeEnumFE,
         feedbacks_based_on_score: [],
         courseName: 'Select Course'
@@ -343,20 +344,39 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       <Select label="Answer Type" id="question-answerType" options={answerTypeOptions} value={answerType} onChange={(e) => setAnswerType(e.target.value as AnswerTypeEnumFE)} error={fieldErrors.answerType} disabled={isSubmitting} required />
       
       <fieldset className="border p-4 rounded-md">
-        <legend className="text-md font-medium text-gray-700 px-1">Answer Options & Scoring</legend>
+        <legend className="text-md font-medium text-gray-700 px-1 flex items-center">
+          Answer Options & Scoring
+          <Tooltip text="Define options for answers and rules for scoring. Individual question scores are capped at 10 points by the system during survey taking.">
+            <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
+          </Tooltip>
+        </legend>
         {(answerType === AnswerTypeEnumFE.MULTIPLE_CHOICE || answerType === AnswerTypeEnumFE.MULTIPLE_SELECT) && (
             <div className="space-y-3 mt-2">
+                <div className="text-xs text-gray-600 mb-2 p-2 bg-blue-50 rounded-md border border-blue-200">
+                    <InformationCircleIcon className="h-4 w-4 inline mr-1 text-blue-500" />
+                    For <strong>Multiple Choice</strong>: Select one correct key using the radio button (awards 10 points if correct, 0 if incorrect by default), OR provide specific scores for each option key (e.g., a:5, b:2, c:0).
+                    <br/>
+                    <InformationCircleIcon className="h-4 w-4 inline mr-1 text-blue-500" />
+                    For <strong>Multiple Select</strong>: Check multiple correct keys using checkboxes (distributes 10 points among them by default), OR provide specific scores per option key.
+                    <br/>
+                    <InformationCircleIcon className="h-4 w-4 inline mr-1 text-blue-500" />
+                    Using specific scores will override the default single/multiple correct key scoring.
+                    <br/>
+                    <InformationCircleIcon className="h-4 w-4 inline mr-1 text-blue-500" />
+                    Survey outcomes can be edited from the <strong>Survey Management</strong> page.
+                    <br/>
+                </div>
                 {options.map((opt, index) => (
                     <div key={index} className="flex items-center space-x-2 p-2 border rounded bg-gray-50">
                         <Input labelClassName="sr-only" label={`Option ${index+1} Key`} placeholder="Key (e.g. a)" value={opt.key} onChange={e => handleOptionChange(index, 'key', e.target.value)} containerClassName="mb-0 flex-shrink w-20" disabled={isSubmitting}/>
                         <Input labelClassName="sr-only" label={`Option ${index+1} Value`} placeholder="Option Text" value={opt.value} onChange={e => handleOptionChange(index, 'value', e.target.value)} containerClassName="mb-0 flex-grow" disabled={isSubmitting}/>
                         {answerType === AnswerTypeEnumFE.MULTIPLE_CHOICE && (
-                            <input type="radio" name="correctKey" value={opt.key} checked={correctKey === opt.key} onChange={() => handleCorrectKeyChange(opt.key)} className="form-radio h-5 w-5 text-indigo-600" disabled={isSubmitting}/>
+                            <input type="radio" name="correctKey" title="Mark as correct" value={opt.key} checked={correctKey === opt.key} onChange={() => handleCorrectKeyChange(opt.key)} className="form-radio h-5 w-5 text-indigo-600" disabled={isSubmitting}/>
                         )}
                         {answerType === AnswerTypeEnumFE.MULTIPLE_SELECT && (
-                             <input type="checkbox" value={opt.key} checked={correctKeys.includes(opt.key)} onChange={() => handleCorrectKeyChange(opt.key)} className="form-checkbox h-5 w-5 text-indigo-600 rounded" disabled={isSubmitting}/>
+                             <input type="checkbox" value={opt.key} title="Mark as correct" checked={correctKeys.includes(opt.key)} onChange={() => handleCorrectKeyChange(opt.key)} className="form-checkbox h-5 w-5 text-indigo-600 rounded" disabled={isSubmitting}/>
                         )}
-                        <Input labelClassName="sr-only" label={`Score for ${opt.key}`} type="number" step="any" placeholder="Score (optional)" value={optionScores[opt.key] === undefined ? '' : optionScores[opt.key]} onChange={e => handleOptionScoreChange(opt.key, e.target.value)} containerClassName="mb-0 w-24" disabled={isSubmitting}/>
+                        <Input labelClassName="sr-only" label={`Score for ${opt.key}`} type="number" step="any" placeholder="Score (opt.)" value={optionScores[opt.key] === undefined ? '' : optionScores[opt.key]} onChange={e => handleOptionScoreChange(opt.key, e.target.value)} containerClassName="mb-0 w-24" disabled={isSubmitting}/>
                         <Button type="button" variant="danger" size="xs" onClick={() => removeOption(index)} disabled={isSubmitting}>X</Button>
                     </div>
                 ))}
@@ -365,8 +385,19 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
         )}
         {answerType === AnswerTypeEnumFE.INPUT && (
             <div className="space-y-3 mt-2">
-                <Input type="number" label="Max Length (Optional)" value={inputMaxLength || ''} onChange={e => setInputMaxLength(parseInt(e.target.value) || undefined)} disabled={isSubmitting} />
-                <h5 className="text-sm font-medium mt-2">Expected Answers (leave blank if any input is acceptable or use default score):</h5>
+                {/*@ts-ignore */}
+                 <Input type="number" label={
+                    <span className="flex items-center">Max Length (Optional)
+                        <Tooltip text="Maximum allowed characters for the input.">
+                             <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
+                        </Tooltip>
+                    </span>} value={inputMaxLength || ''} onChange={e => setInputMaxLength(parseInt(e.target.value) || undefined)} disabled={isSubmitting} />
+                <h5 className="text-sm font-medium mt-2 flex items-center">
+                    Expected Answers
+                     <Tooltip text="Define specific answers and their scores. If no expected answers, default incorrect score (usually 0) applies.">
+                         <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
+                    </Tooltip>
+                </h5>
                 {expectedAnswers.map((ea, index) => (
                     <div key={index} className="flex items-end space-x-2 p-2 border rounded bg-gray-50">
                         <Textarea labelClassName="sr-only" label="Expected Text" placeholder="Expected Text" value={ea.text} onChange={e => handleExpectedAnswerChange(index, 'text', e.target.value)} rows={1} containerClassName="mb-0 flex-grow" disabled={isSubmitting}/>
@@ -386,15 +417,41 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                 <Input type="number" label="Min Value" value={rangeMin} onChange={e => setRangeMin(parseFloat(e.target.value))} disabled={isSubmitting}/>
                 <Input type="number" label="Max Value" value={rangeMax} onChange={e => setRangeMax(parseFloat(e.target.value))} disabled={isSubmitting}/>
                 <Input type="number" label="Step" value={rangeStep} onChange={e => setRangeStep(parseFloat(e.target.value))} disabled={isSubmitting}/>
-                <Input type="number" label="Target Value (for scoring)" value={targetValue} onChange={e => setTargetValue(parseFloat(e.target.value))} disabled={isSubmitting}/>
-                <Input type="number" label="Score at Target" step="any" value={scoreAtTarget} onChange={e => setScoreAtTarget(parseFloat(e.target.value))} disabled={isSubmitting}/>
-                <Input type="number" label="Score Change per Deviation Unit" step="any" value={scorePerDeviation} onChange={e => setScorePerDeviation(parseFloat(e.target.value))} disabled={isSubmitting}/>
+                {/*@ts-ignore */}
+                <Input type="number" label={
+                    <span className="flex items-center">Target Value
+                         <Tooltip text="The ideal value the student should select for maximum points.">
+                             <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
+                        </Tooltip>
+                    </span>
+                } value={targetValue} onChange={e => setTargetValue(parseFloat(e.target.value))} disabled={isSubmitting}/>
+                {/*@ts-ignore */}
+                <Input type="number" label={
+                     <span className="flex items-center">Score at Target
+                         <Tooltip text="Points awarded if student selects the target value. Capped at 10 by the system.">
+                             <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
+                        </Tooltip>
+                    </span>
+                } step="any" value={scoreAtTarget} onChange={e => setScoreAtTarget(parseFloat(e.target.value))} disabled={isSubmitting}/>
+                {/*@ts-ignore */}
+                <Input type="number" label={
+                     <span className="flex items-center">Score Change per Deviation
+                         <Tooltip text="Points to add/subtract (usually negative) for each unit of deviation from the target value.">
+                             <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
+                        </Tooltip>
+                    </span>
+                } step="any" value={scorePerDeviation} onChange={e => setScorePerDeviation(parseFloat(e.target.value))} disabled={isSubmitting}/>
             </div>
         )}
       </fieldset>
 
       <fieldset className="border p-4 rounded-md mt-4">
-        <legend className="text-md font-medium text-gray-700 px-1">Default Feedback Rules (based on question score)</legend>
+        <legend className="text-md font-medium text-gray-700 px-1 flex items-center">
+            Default Feedback Rules (based on question score)
+            <Tooltip text="Feedback shown to student based on their score for THIS question, if not overridden by course-specific QCA feedback.">
+                <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
+            </Tooltip>
+        </legend>
         {defaultFeedbacks.map((fb, index) => (
           <div key={index} className="p-3 border rounded-md space-y-2 bg-gray-50 my-2">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
@@ -416,15 +473,22 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                     <Select
                         label={`Associated Course ${qcaIndex+1}`}
                         options={allCourses.map(c => ({ value: c.id, label: `${c.name} (${c.code})` }))}
-                        value={qca.course_id || ""} // Ensure value is not undefined for controlled Select
+                        value={qca.course_id || ""} 
                         onChange={e => handleQCAChange(qcaIndex, 'course_id', e.target.value)}
                         disabled={isSubmitting || !!qca.id} 
                         placeholder="Select a course"
                         containerClassName="mb-0"
                         error={fieldErrors[`qca_course_${qcaIndex}`]} 
                     />
-                     <Select
-                        label="Answer Association Type"
+                    {/*@ts-ignore */}
+                     <Select label={
+                            <span className="flex items-center">
+                                Answer Association Type
+                                <Tooltip text="Positive: Question score contributes positively to the course total. Negative: Question score subtracts from the course total (e.g., a high score on a pre-assessment question means less need for this specific course).">
+                                    <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
+                                </Tooltip>
+                            </span>
+                        }
                         options={associationTypeOptions}
                         value={qca.answer_association_type}
                         onChange={e => handleQCAChange(qcaIndex, 'answer_association_type', e.target.value as AnswerAssociationTypeEnumFE)}
@@ -434,7 +498,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                     <Button type="button" variant="danger" size="xs" onClick={() => handleRemoveQCA(qcaIndex)} disabled={isSubmitting} className="self-center mt-4 md:mt-0">Remove Association</Button>
                 </div>
                 <div className="ml-4 border-l-2 pl-3 space-y-2">
-                    <h5 className="text-sm font-medium text-gray-600">Course-Specific Feedback for "{qca.courseName || 'Selected Course'}"</h5>
+                    <h5 className="text-sm font-medium text-gray-600 flex items-center">
+                        Course-Specific Feedback for "{qca.courseName || 'Selected Course'}"
+                        <Tooltip text="This feedback overrides the default question feedback when this question is answered in the context of this specific course.">
+                           <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-1 cursor-pointer" />
+                        </Tooltip>
+                    </h5>
                     {(qca.feedbacks_based_on_score || []).map((fb, fbIndex) => (
                         <div key={fbIndex} className="p-2 border rounded bg-white space-y-2">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">

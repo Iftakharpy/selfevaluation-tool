@@ -1,20 +1,23 @@
 // File: ui/src/pages/SurveyResultsPage.tsx
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom'; // Added useNavigate
+import { useParams, Link, useNavigate } from 'react-router-dom'; 
 import surveyAttemptService from '../services/surveyAttemptService';
-import surveyService from '../services/surveyService'; // To fetch survey details for names
+import surveyService from '../services/surveyService'; 
 import type { SurveyAttemptResultFE } from '../types/surveyAttemptTypes';
-import type { SurveyFE } from '../types/surveyTypes'; // To get survey title and course names
-import type { Course } from '../types/courseTypes'; // For course names
+import type { SurveyFE } from '../types/surveyTypes'; 
+import type { Course } from '../types/courseTypes'; 
 import { useNotifier } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import CourseResultCard from '../components/results/CourseResultCard';
 import Button from '../components/forms/Button';
-import courseService from '../services/courseService'; // To fetch course names
+import courseService from '../services/courseService'; 
+import { InformationCircleIcon } from '../components/icons/InformationCircleIcon'; // IMPORT ICON
+import Tooltip from '../components/common/Tooltip'; // IMPORT TOOLTIP
+
 
 const SurveyResultsPage: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
-  const navigate = useNavigate(); // For navigation
+  const navigate = useNavigate(); 
   const { addNotification } = useNotifier();
   const { user, isLoading: authLoading } = useAuth();
 
@@ -43,13 +46,7 @@ const SurveyResultsPage: React.FC = () => {
           const surveyData = await surveyService.getSurveyDetail(attemptData.survey_id);
           setSurveyDetails(surveyData);
           
-          // Create a map of course IDs to names for easier lookup
           if (surveyData.course_ids && surveyData.course_ids.length > 0) {
-            // Ideally, course details (name, code) would be part of SurveyFE if fetched with questions,
-            // or we'd fetch them. For simplicity if not directly available, we'll make a call.
-            // This assumes SurveyFE.questions might contain course_id which is less direct.
-            // A better approach might be to iterate surveyData.course_ids and fetch each.
-            // For now, let's assume we might need to fetch all courses and filter.
             const allCourses = await courseService.listCourses();
             const cNameMap: Record<string, string> = {};
             surveyData.course_ids.forEach(cId => {
@@ -102,7 +99,7 @@ const SurveyResultsPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="bg-white shadow-xl rounded-lg p-6 md:p-8">
         <h1 className="text-3xl font-bold text-indigo-700 mb-1">
-           Results for "{surveyDetails?.title || 'Survey'}"
+           Results for "{surveyDetails?.title || results.survey_title || 'Survey'}"
         </h1>
          {results.student_display_name && user?.role === 'teacher' && (
             <p className="text-md text-gray-600 mb-1">Student: {results.student_display_name}</p>
@@ -124,6 +121,10 @@ const SurveyResultsPage: React.FC = () => {
               </span>
             )}
           </div>
+           <p className="text-xs text-gray-500 mt-2 flex items-center">
+            <InformationCircleIcon className="h-4 w-4 mr-1 text-gray-400" />
+            Note: Individual question scores are standardized (0-10 points) before summing into course/overall totals.
+          </p>
         </div>
 
         {results.overall_survey_feedback && (
