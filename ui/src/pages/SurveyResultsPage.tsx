@@ -5,14 +5,14 @@ import surveyAttemptService from '../services/surveyAttemptService';
 import surveyService from '../services/surveyService'; 
 import type { SurveyAttemptResultFE } from '../types/surveyAttemptTypes';
 import type { SurveyFE } from '../types/surveyTypes'; 
-import type { Course } from '../types/courseTypes'; 
+// import type { Course } from '../types/courseTypes'; // No longer directly needed here
 import { useNotifier } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import CourseResultCard from '../components/results/CourseResultCard';
 import Button from '../components/forms/Button';
 import courseService from '../services/courseService'; 
-import { InformationCircleIcon } from '../components/icons/InformationCircleIcon'; // IMPORT ICON
-import Tooltip from '../components/common/Tooltip'; // IMPORT TOOLTIP
+import { InformationCircleIcon } from '../components/icons/InformationCircleIcon';
+import Tooltip from '../components/common/Tooltip';
 
 
 const SurveyResultsPage: React.FC = () => {
@@ -47,7 +47,7 @@ const SurveyResultsPage: React.FC = () => {
           setSurveyDetails(surveyData);
           
           if (surveyData.course_ids && surveyData.course_ids.length > 0) {
-            const allCourses = await courseService.listCourses();
+            const allCourses = await courseService.listCourses(); // Fetch all courses once
             const cNameMap: Record<string, string> = {};
             surveyData.course_ids.forEach(cId => {
                 const foundCourse = allCourses.find(rc => rc.id === cId);
@@ -110,7 +110,12 @@ const SurveyResultsPage: React.FC = () => {
         </p>
 
         <div className="bg-gray-100 p-4 rounded-lg mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Overall Survey Performance</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2 flex items-center">
+            Overall Survey Performance
+            <Tooltip text="This is the sum of your scores across all courses in this survey, compared to the total maximum possible score for the entire survey.">
+                <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 ml-2 cursor-pointer" />
+            </Tooltip>
+          </h2>
           <div className="flex items-baseline space-x-2">
             <span className="text-gray-700 font-medium">Total Score:</span>
             <span className="text-3xl font-bold text-indigo-600">{overallActualScore.toFixed(1)}</span>
