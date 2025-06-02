@@ -9,7 +9,7 @@ const MainLayout: React.FC = () => {
       <nav className="bg-gray-800 text-white p-4 shadow-lg">
         <div className="container mx-auto flex justify-between items-center">
           <Link to="/" className="text-2xl font-bold hover:text-gray-300 transition-colors">
-            Narsus Eval
+            Self Eval
           </Link>
           <div className="space-x-4">
             {isAuthenticated && user ? (
@@ -37,7 +37,7 @@ const MainLayout: React.FC = () => {
         <Outlet /> {/* Nested routes will render here */}
       </main>
       <footer className="bg-gray-100 text-gray-600 text-center p-4 border-t">
-        © {new Date().getFullYear()} Narsus Self-Evaluation Tool
+        © {new Date().getFullYear()} Self-Evaluation Tool
       </footer>
     </div>
   );

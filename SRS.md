@@ -42,6 +42,9 @@ The purpose of this web application is to provide a pre-assessment tool for stud
 - Each question/course/skill has associated scoring and feedback rules.
 - Feedback is shown based on score thresholds (e.g., “lt”/“gt” comparisons).
 - Three result cases: recommended to take the course, eligible for eRPL, or not suitable.
+- The scores for questions should be standardized 0-10.
+- The scores for Course should be scaled after doing the addition of the scores and shown in percentage. Example: there are 20 questions in a course, max score for the course is 200, and if the student gets 160 score then the final score would be (160/200)*100 percent.
+- And the survey should also have the same style of criteria for all evaluation for all the courses overall, this can be useful for module(multiple courses) competency assessment.
 
 ### 2.5 Result Management
 - All assessment results are stored and can be reviewed by teachers and students.

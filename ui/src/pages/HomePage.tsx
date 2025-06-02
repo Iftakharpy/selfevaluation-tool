@@ -10,7 +10,7 @@ const HomePage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="bg-white shadow-xl rounded-lg p-8 text-center">
         <h1 className="text-4xl font-bold text-indigo-600 mb-4">
-          Welcome to Narsus Self-Evaluation, {user?.display_name}!
+          Welcome to Self-Evaluation Tool, {user?.display_name}!
         </h1>
         <p className="text-xl text-gray-700 mb-2">
           You are logged in as a: <span className="font-semibold text-indigo-500">{user?.role}</span>
