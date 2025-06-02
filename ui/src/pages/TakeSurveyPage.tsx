@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'; // Added useRef
+// ui/src/pages/TakeSurveyPage.tsx
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import surveyAttemptService from '../services/surveyAttemptService';
 import surveyService from '../services/surveyService';
@@ -30,13 +31,10 @@ const TakeSurveyPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const initialized = useRef(false); // Added ref to track initialization
+  const initialized = useRef(false);
 
-  // Fetch survey details and start/resume attempt
   useEffect(() => {
     if (!surveyId || !user) return;
-
-    // Prevent effect from running twice in StrictMode or due to other re-renders
     if (initialized.current) return;
     initialized.current = true;
 
@@ -65,10 +63,9 @@ const TakeSurveyPage: React.FC = () => {
         const msg = err.response?.data?.detail || "Failed to load survey or start attempt.";
         setError(msg);
         addNotification(msg, 'error');
-        if (msg.includes("Published survey not found")) { // Be more specific for navigation
+        if (msg.includes("Published survey not found")) {
              navigate('/surveys');
         } else {
-            // For other errors, maybe a general error page or back
             navigate(-1); 
         }
       } finally {
@@ -76,7 +73,7 @@ const TakeSurveyPage: React.FC = () => {
       }
     };
     initializeSurvey();
-  }, [surveyId, user, navigate, addNotification]); // Dependencies are correct
+  }, [surveyId, user, navigate, addNotification]);
 
   const handleAnswerChange = useCallback((
     questionId: string, 
@@ -102,7 +99,7 @@ const TakeSurveyPage: React.FC = () => {
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev + 1);
+      setCurrentQuestionIndex(prev => prev - 1); // CORRECTED
     }
   };
 

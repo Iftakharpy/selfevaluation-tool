@@ -10,8 +10,8 @@ import Textarea from './TextArea';
 import Button from './Button';
 import Select from './Select';
 import { useNotifier } from '../../contexts/NotificationContext';
-import Tooltip from '../common/Tooltip'; // IMPORT
-import { InformationCircleIcon } from '../icons/InformationCircleIcon'; // IMPORT
+import Tooltip from '../common/Tooltip';
+import { InformationCircleIcon } from '../icons/InformationCircleIcon';
 
 interface SurveyFormProps {
   initialData?: SurveyFE | null;
