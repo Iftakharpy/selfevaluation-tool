@@ -1,8 +1,10 @@
+// ui/src/pages/CoursesPage.tsx
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom'; // IMPORT useNavigate
 import courseService from '../services/courseService';
 import type { Course, CourseCreate, CourseUpdate } from '../types/courseTypes';
 import ResourceTable from '../components/management/ResourceTable';
-import type { Column } from '../components/management/ResourceTable'; // Assuming ResourceTable exports Column type
+import type { Column } from '../components/management/ResourceTable';
 import Button from '../components/forms/Button';
 import Modal from '../components/modals/Modal';
 import CourseForm from '../components/forms/CourseForm';
@@ -19,6 +21,7 @@ const CoursesPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   
   const { addNotification } = useNotifier();
+  const navigate = useNavigate(); // INITIALIZE useNavigate
 
   const fetchCourses = useCallback(async () => {
     setIsLoading(true);
@@ -51,6 +54,11 @@ const CoursesPage: React.FC = () => {
   const handleOpenDeleteModal = (course: Course) => {
     setSelectedCourse(course);
     setIsDeleteModalOpen(true);
+  };
+
+  // ADDED: Handler for viewing course details
+  const handleViewDetails = (course: Course) => {
+    navigate(`/courses/details/${course.id}`);
   };
 
   const handleCloseModal = () => {
@@ -88,7 +96,7 @@ const CoursesPage: React.FC = () => {
 
   const handleDeleteCourse = async () => {
     if (!selectedCourse || !selectedCourse.id) return;
-    setIsSubmitting(true); // Use isSubmitting for delete loading state as well
+    setIsSubmitting(true);
     try {
       await courseService.deleteCourse(selectedCourse.id);
       addNotification('Course deleted successfully!', 'success');
@@ -121,12 +129,13 @@ const CoursesPage: React.FC = () => {
         columns={columns}
         onEdit={handleOpenEditModal}
         onDelete={handleOpenDeleteModal}
+        onView={handleViewDetails} // ADDED: Pass the onView handler
         isLoading={isLoading}
       />
 
       <Modal
         isOpen={isModalOpen}
-        size='3xl'
+        size='xl' // Adjusted size for CourseForm
         onClose={handleCloseModal}
         title={selectedCourse ? 'Edit Course' : 'Create New Course'}
       >

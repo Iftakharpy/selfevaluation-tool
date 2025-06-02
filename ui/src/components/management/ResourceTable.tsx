@@ -1,9 +1,11 @@
+// ui/src/components/management/ResourceTable.tsx
 import React from 'react';
+import { Link } from 'react-router-dom'; // Import Link for viewLinkPrefix
 import Button from '../forms/Button';
 
 export interface Column<T> {
   header: string;
-  accessor: keyof T | ((item: T) => React.ReactNode); // Accessor can be a key or a function
+  accessor: keyof T | ((item: T) => React.ReactNode);
   className?: string;
 }
 
@@ -12,8 +14,9 @@ export interface ResourceTableProps<T extends { id: string }> {
   columns: Column<T>[];
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
+  onView?: (item: T) => void; // ADDED: For a generic view action
   isLoading?: boolean;
-  viewLinkPrefix?: string; // e.g., "/courses" to link to "/courses/:id"
+  viewLinkPrefix?: string; 
 }
 
 const ResourceTable = <T extends { id: string }>({
@@ -21,6 +24,7 @@ const ResourceTable = <T extends { id: string }>({
   columns,
   onEdit,
   onDelete,
+  onView, // ADDED
   isLoading = false,
   viewLinkPrefix
 }: ResourceTableProps<T>) => {
@@ -45,7 +49,7 @@ const ResourceTable = <T extends { id: string }>({
                 {col.header}
               </th>
             ))}
-            {(onEdit || onDelete || viewLinkPrefix) && (
+            {(onEdit || onDelete || viewLinkPrefix || onView) && ( // MODIFIED: Added onView to condition
               <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -62,13 +66,20 @@ const ResourceTable = <T extends { id: string }>({
                     : String(item[col.accessor] ?? '')}
                 </td>
               ))}
-              {(onEdit || onDelete || viewLinkPrefix) && (
+              {(onEdit || onDelete || viewLinkPrefix || onView) && ( // MODIFIED: Added onView to condition
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                  {viewLinkPrefix && (
-                    <a href={`${viewLinkPrefix}/${item.id}`} className="text-indigo-600 hover:text-indigo-900">View</a>
+                  {viewLinkPrefix && !onView && ( // Only show if onView is not provided
+                    <Link to={`${viewLinkPrefix}/${item.id}`} className="text-indigo-600 hover:text-indigo-900">
+                      View (Link)
+                    </Link>
+                  )}
+                  {onView && ( // ADDED: Generic View Button
+                    <Button variant="ghost" size="sm" onClick={() => onView(item)} className="text-blue-600 hover:text-blue-800">
+                        Details
+                    </Button>
                   )}
                   {onEdit && (
-                    <Button variant="ghost" size="sm" onClick={() => onEdit(item)}> {/* Assuming Button has size prop */}
+                    <Button variant="ghost" size="sm" onClick={() => onEdit(item)}>
                         Edit
                     </Button>
                   )}

@@ -2,7 +2,7 @@
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 from app.users.data_types import PyObjectId
-from app.surveys.data_types import SurveyQuestionDetail, OutcomeCategoryEnum
+from app.surveys.data_types import SurveyQuestionDetail, OutcomeCategoryEnum # Ensure this is correct from surveys.data_types
 from datetime import datetime, UTC 
 
 class StudentAnswerPayload(BaseModel):
@@ -37,7 +37,7 @@ class SurveyAttemptBase(BaseModel):
     overall_survey_feedback: Optional[str] = Field(None, description="Overall feedback for the survey.")
     course_outcome_categorization: Dict[str, OutcomeCategoryEnum] = Field(default_factory=dict)
     
-    # --- FIELDS FOR MAX SCORES (populated from the Survey document) ---
+    # --- FIELDS POPULATED FROM THE Survey DOCUMENT ---
     max_scores_per_course: Optional[Dict[str, float]] = Field(
         default_factory=dict,
         description="Maximum possible score for each course in this survey. Key is course_id (str)."
@@ -46,7 +46,10 @@ class SurveyAttemptBase(BaseModel):
         None,
         description="Overall maximum possible score for this survey."
     )
-    # --- END FIELDS ---
+    # ADDED THESE LINES:
+    survey_title: Optional[str] = Field(None, description="Title of the survey, populated from the Survey document.")
+    survey_description: Optional[str] = Field(None, description="Description of the survey, populated from the Survey document.")
+    # --- END ADDED LINES ---
     
     model_config = ConfigDict(
         populate_by_name=True,
@@ -72,9 +75,11 @@ class SurveyAttemptOut(SurveyAttemptBase):
     survey_id: str  
     answers: Optional[List[StudentAnswerOut]] = None 
     student_display_name: Optional[str] = None 
+    # survey_title and survey_description are inherited from SurveyAttemptBase
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class SurveyAttemptResultOut(SurveyAttemptOut): 
+    # Inherits all fields from SurveyAttemptOut, including answers and populated survey_title/description
     pass
 
 class SubmitAnswersRequest(BaseModel):

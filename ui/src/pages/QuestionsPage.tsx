@@ -1,12 +1,14 @@
+// ui/src/pages/QuestionsPage.tsx
 import React, { useEffect, useState, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom'; // IMPORT useLocation & useNavigate
 import questionService from '../services/questionService';
 import qcaService from '../services/qcaService'; 
 import type { QuestionListItemFE, QuestionFE, QuestionCreateFE, QuestionUpdateFE } from '../types/questionTypes';
-import type { QCA, QCACreate, QCAUpdate } from '../types/qcaTypes'; 
+import type { QCA, QCACreate, QCAUpdate, AnswerAssociationTypeEnumFE } from '../types/qcaTypes'; // Ensure AnswerAssociationTypeEnumFE is imported
 import ResourceTable from '../components/management/ResourceTable';
 import type { Column } from '../components/management/ResourceTable';
 import Button from '../components/forms/Button';
-import Modal from '../components/modals/Modal'; // Ensure this is the updated Modal
+import Modal from '../components/modals/Modal';
 import QuestionForm from '../components/forms/QuestionForm';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { useNotifier } from '../contexts/NotificationContext';
@@ -27,6 +29,9 @@ const QuestionsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState(''); 
   
   const { addNotification } = useNotifier();
+  const location = useLocation(); // For query params
+  const navigate = useNavigate(); // For clearing query params
+
 
   const fetchQuestionsAndDependencies = useCallback(async () => {
     setIsLoadingTable(true);
@@ -44,14 +49,41 @@ const QuestionsPage: React.FC = () => {
     fetchQuestionsAndDependencies();
   }, [fetchQuestionsAndDependencies]);
 
-  const handleOpenCreateModal = () => {
+  // EFFECT TO HANDLE QUERY PARAMS FOR EDITING OR PRE-FILLING
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const editQuestionId = queryParams.get('edit');
+    const prefillCourseIdForNewQuestion = queryParams.get('prefillCourseId');
+
+    if (editQuestionId) {
+      const questionToEdit = questions.find(q => q.id === editQuestionId);
+      if (questionToEdit) {
+        handleOpenEditModal(questionToEdit, true); // Pass a flag to prevent clearing query params immediately
+      } else if (!isLoadingTable) { 
+        // If questions are loaded and still not found, it's an invalid ID
+        addNotification(`Question with ID ${editQuestionId} not found for editing.`, 'warning');
+        navigate('/questions/manage', { replace: true }); // Clear query params
+      }
+    } else if (prefillCourseIdForNewQuestion && !isModalOpen && !editingQuestion) { // Only open if not already in a modal
+        handleOpenCreateModal(prefillCourseIdForNewQuestion, true); // Pass flag
+    }
+  }, [location.search, questions, isLoadingTable]); // Rerun when search params or questions list change
+
+  const handleOpenCreateModal = (prefillCourseId?: string | null, calledFromEffect = false) => {
     setEditingQuestion(null); 
-    setEditingQuestionQCAs([]);
+    const initialQcasForCreate = prefillCourseId
+    // @ts-ignore
+      ? [{ course_id: prefillCourseId, question_id: '', answer_association_type: 'positive' as AnswerAssociationTypeEnumFE, feedbacks_based_on_score: [] } as QCA] // Cast to QCA for initialQcas prop
+      : [];
+    setEditingQuestionQCAs(initialQcasForCreate);
     setFormError(null);
     setIsModalOpen(true);
+    if (!calledFromEffect) { // Clear query params if opened by button click
+        navigate('/questions/manage', { replace: true });
+    }
   };
 
-  const handleOpenEditModal = async (questionItem: QuestionListItemFE) => {
+  const handleOpenEditModal = async (questionItem: QuestionListItemFE, calledFromEffect = false) => {
     setIsModalLoading(true); 
     setFormError(null);
     setEditingQuestion(null); 
@@ -66,6 +98,9 @@ const QuestionsPage: React.FC = () => {
         setIsModalOpen(false); 
     } finally {
         setIsModalLoading(false); 
+        if (!calledFromEffect) { // Clear query params if opened by button click
+            navigate('/questions/manage', { replace: true });
+        }
     }
   };
 
@@ -87,7 +122,10 @@ const QuestionsPage: React.FC = () => {
     setEditingQuestion(null);
     setEditingQuestionQCAs([]);
     setFormError(null);
+    // Clear query params when modal is closed, regardless of how it was opened
+    navigate('/questions/manage', { replace: true }); 
   };
+
   const handleCloseDeleteModal = () => {
     setIsDeleteModalOpen(false);
     setEditingQuestion(null);
@@ -122,20 +160,13 @@ const QuestionsPage: React.FC = () => {
       if (qcasToDelete.length > 0) addNotification(`${qcasToDelete.length} course association(s) removed.`, 'info');
 
       for (const qcaDataFromForm of qcasToUpdateOrCrate) {
-        // @ts-ignore
-        if (qcaDataFromForm?.id) { 
+        const qcaIsExisting = 'id' in qcaDataFromForm && qcaDataFromForm.id;
+        if (qcaIsExisting) { 
           const updatePayload: QCAUpdate = {
             answer_association_type: qcaDataFromForm.answer_association_type,
             feedbacks_based_on_score: qcaDataFromForm.feedbacks_based_on_score,
           };
-          if (qcaDataFromForm.answer_association_type === undefined) {
-            delete updatePayload.answer_association_type;
-          }
-          if (qcaDataFromForm.feedbacks_based_on_score === undefined) {
-            delete updatePayload.feedbacks_based_on_score;
-          }
-          // @ts-ignore
-          await qcaService.updateQCA(qcaDataFromForm.id, updatePayload);
+          await qcaService.updateQCA(qcaDataFromForm.id as string, updatePayload);
         } else { 
           const createPayload: QCACreate = {
             question_id: currentQuestionId, 
@@ -150,7 +181,7 @@ const QuestionsPage: React.FC = () => {
       }
       if (qcasToUpdateOrCrate.length > 0) addNotification(`${qcasToUpdateOrCrate.length} course association(s) saved.`, 'info');
       
-      handleCloseModal();
+      handleCloseModal(); // This will also clear query params
       fetchQuestionsAndDependencies(); 
     } catch (error: any) {
       let friendlyErrorMessage = "An unexpected error occurred during submission.";
@@ -208,7 +239,7 @@ const QuestionsPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Manage Questions</h1>
-        <Button onClick={handleOpenCreateModal} variant="primary" disabled={isLoadingTable || isModalLoading}>
+        <Button onClick={() => handleOpenCreateModal()} variant="primary" disabled={isLoadingTable || isModalLoading}>
           Create New Question
         </Button>
       </div>
@@ -227,7 +258,7 @@ const QuestionsPage: React.FC = () => {
       <ResourceTable<QuestionListItemFE>
         data={filteredQuestions}
         columns={columns}
-        onEdit={handleOpenEditModal}
+        onEdit={(item) => handleOpenEditModal(item)} // Use custom onEdit to clear query params properly
         onDelete={handleOpenDeleteModal}
         isLoading={isLoadingTable && !isModalOpen} 
       />
@@ -236,15 +267,10 @@ const QuestionsPage: React.FC = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editingQuestion?.id ? 'Edit Question' : 'Create New Question'}
-        size="4xl"
-        // The QuestionForm has its own overflow-y-auto and max-height
-        // so the modal's content area doesn't need explicit overflow handling here.
-        // We can pass a class to style the modal body if needed for padding, etc.
-        // bodyClassName="max-h-[80vh] overflow-y-auto" // Example if QuestionForm didn't scroll
+        size="3xl" 
       >
         {isModalLoading && <div className="text-center p-4">Loading question data...</div>}
-        {/* @ts-ignore */}
-        {!isModalLoading && isModalOpen && (editingQuestion || !editingQuestion?.id) && ( 
+        {!isModalLoading && isModalOpen && (
              <QuestionForm
                 initialData={editingQuestion}
                 initialQcas={editingQuestionQCAs}
