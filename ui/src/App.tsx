@@ -17,10 +17,9 @@ import SurveyListPage from './pages/SurveyListPage';
 import TakeSurveyPage from './pages/TakeSurveyPage';
 import MyAttemptsPage from './pages/MyAttemptsPage';
 import SurveyResultsPage from './pages/SurveyResultsPage';
-import CoursesPage from './pages/CoursesPage';      // NEW
-import QuestionsPage from './pages/QuestionsPage';  // NEW
-// Import other page components as you create them
-// import SurveyManagementPage from './pages/SurveyManagementPage';
+import CoursesPage from './pages/CoursesPage';
+import QuestionsPage from './pages/QuestionsPage';
+import SurveyManagementPage from './pages/SurveyManagementPage'; // ADDED
 
 
 function App() {
@@ -70,21 +69,21 @@ function App() {
           element={<ProtectedRoute allowedRoles={['teacher']}><TeacherDashboardPage /></ProtectedRoute>} 
         />
         <Route 
-          path="/courses/manage" // Changed path for clarity
+          path="/courses/manage"
           element={<ProtectedRoute allowedRoles={['teacher']}><CoursesPage /></ProtectedRoute>} 
         />
         <Route 
-          path="/questions/manage" // Changed path for clarity
+          path="/questions/manage"
           element={<ProtectedRoute allowedRoles={['teacher']}><QuestionsPage /></ProtectedRoute>} 
         />
-        {/* <Route 
-          path="/surveys/manage" 
+        <Route 
+          path="/surveys/manage" // ADDED THIS ROUTE
           element={
             <ProtectedRoute allowedRoles={['teacher']}>
               <SurveyManagementPage />
             </ProtectedRoute>
           } 
-        /> */}
+        />
       </Route>
       
       <Route path="*" element={<Navigate to="/" replace />} />

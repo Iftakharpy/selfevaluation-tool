@@ -1,3 +1,4 @@
+// File: ui/src/types/surveyTypes.ts
 // Corresponds to backend's AnswerTypeEnum
 export enum AnswerTypeEnumFE { // Added FE suffix to avoid potential name clashes if importing from backend types directly later
   MULTIPLE_CHOICE = "multiple_choice",
@@ -59,12 +60,39 @@ export interface SurveySummaryListItemFE {
   created_by: string;
   created_at: string; // ISO date string
   updated_at: string; // ISO date string
-  // อาจจะเพิ่มจำนวนคำถามหรือ course names ที่ resolve แล้วถ้า API ส่งมา
+  // Maybe add number of questions or resolved course names if API sends them
 }
 
 // For taking a survey - detailed view (maps to backend's SurveyOut with include_questions=true)
-export interface SurveyForTakingFE extends SurveySummaryListItemFE {
-  questions: SurveyQuestionDetailFE[]; // Included when fetching for taking a survey
-  course_skill_total_score_thresholds?: Record<string, ScoreFeedbackItemFE[]> | null;
-  course_outcome_thresholds?: Record<string, OutcomeThresholdItemFE[]> | null;
+// Also suitable for editing a survey in the form
+export interface SurveyFE extends SurveySummaryListItemFE { // Changed from SurveyForTakingFE to be more general
+  questions?: SurveyQuestionDetailFE[]; // Optional, as it might not always be needed for management list
+  course_skill_total_score_thresholds?: Record<string, ScoreFeedbackItemFE[]> | null; // Key is course_id string
+  course_outcome_thresholds?: Record<string, OutcomeThresholdItemFE[]> | null;     // Key is course_id string
 }
+
+
+// --- NEW TYPES FOR SURVEY MANAGEMENT ---
+
+// For creating a survey (frontend perspective)
+export interface SurveyCreateFE {
+  title: string;
+  description?: string | null;
+  course_ids: string[]; // Array of course IDs
+  is_published: boolean;
+  course_skill_total_score_thresholds?: Record<string, ScoreFeedbackItemFE[]>; // Key is course_id string
+  course_outcome_thresholds?: Record<string, OutcomeThresholdItemFE[]>;     // Key is course_id string
+}
+
+// For updating a survey (frontend perspective)
+export interface SurveyUpdateFE {
+  title?: string;
+  description?: string | null;
+  course_ids?: string[];
+  is_published?: boolean;
+  course_skill_total_score_thresholds?: Record<string, ScoreFeedbackItemFE[]>;
+  course_outcome_thresholds?: Record<string, OutcomeThresholdItemFE[]>;
+}
+
+// Re-alias for clarity in contexts where full detail is needed (like taking or editing)
+export type SurveyForTakingFE = SurveyFE;
