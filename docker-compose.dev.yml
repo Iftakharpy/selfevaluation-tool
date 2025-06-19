@@ -9,7 +9,7 @@ services:
       - ./api:/root 
     working_dir: /root 
     environment:
-      - MONGO_URL=mongodb://mongodb_dev:27017 # CORRECTED: Match service name
+      - MONGO_URL=mongodb://mongodb_dev:27018 # CORRECTED: Match service name
       - DATABASE_NAME=survey_db_dev 
       - SESSION_SECRET_KEY=a_dev_secret_key_for_sessions
       - DEV_UI_HOST_PORT_VITE=5174 # For CORS settings.py
@@ -57,11 +57,12 @@ services:
     image: mongo:latest
     container_name: mongodb_dev
     ports:
-      - "127.0.0.1:27018:27017" 
+      - "127.0.0.1:27018:27018" 
     volumes:
       - mongodb_dev_data:/data/db
     restart: unless-stopped
     stop_grace_period: 0s
+    command: ["mongod", "--port", "27018"]
 
 volumes:
   mongodb_dev_data:

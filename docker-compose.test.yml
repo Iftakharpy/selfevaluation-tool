@@ -9,7 +9,7 @@ services:
       - ./api:/root 
     working_dir: /root 
     environment:
-      - MONGO_URL=mongodb://mongodb_test:27017 
+      - MONGO_URL=mongodb://mongodb_test:27019 
       - DATABASE_NAME=survey_db_test 
       - SESSION_SECRET_KEY=a_secure_test_secret_for_sessions
     depends_on:
@@ -34,11 +34,12 @@ services:
     image: mongo:latest
     container_name: mongodb_test
     ports:
-      - "127.0.0.1:27019:27017" 
+      - "127.0.0.1:27019:27019" 
     volumes:
       - mongodb_test_data:/data/db 
     restart: unless-stopped 
     stop_grace_period: 0s
+    command: ["mongod", "--port", "27019"]
 
 volumes:
   mongodb_test_data:

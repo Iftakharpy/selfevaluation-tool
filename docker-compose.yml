@@ -32,6 +32,7 @@ services:
     volumes:
       - mongodb_prod_data:/data/db 
     restart: always
+    command: ["mongod", "--port", "27017"]
 
 volumes:
   mongodb_prod_data:
