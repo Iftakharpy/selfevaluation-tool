@@ -1,4 +1,5 @@
 - [Project info](#project-info)
+  - [Additional info:](#additional-info)
   - [Frontend pages](#frontend-pages)
   - [Production environment setup guide](#production-environment-setup-guide)
   - [Development environment setup guide](#development-environment-setup-guide)
@@ -18,6 +19,9 @@ This project is separated in two parts UI and API for development ease. These ar
 
 > Current implemented functionalities of the API's and UI can be seen by running the project with docker following the steps in the [production](#production-environment-setup-guide) or [development](#development-environment-setup-guide).
 
+## Additional info:
+- [SRS](./SRS.md)
+- [Implementation details](./ImplementationSection.md)
 
 
 

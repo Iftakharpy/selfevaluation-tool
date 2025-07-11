@@ -1,6 +1,6 @@
 ## Chapter 4: Implementation
 
-This chapter provides a comprehensive account of the technical realization of the Self-Evaluation Tool, a web-based application designed to facilitate student self-assessment and provide management capabilities for educators. The discussion herein encompasses the overall software architecture, a detailed breakdown of the functionalities implemented in both the backend Application Programming Interface (API) and the frontend User Interface (UI), justifications for pivotal design and technology choices, an overview of the development process, and an exploration of potential avenues for future enhancements.
+Self-Evaluation Tool is a web-based application designed to facilitate student self-assessment and provide management capabilities for educators. The discussion herein encompasses the overall software architecture, a detailed breakdown of the functionalities implemented in both the backend Application Programming Interface (API) and the frontend User Interface (UI), justifications for pivotal design and technology choices, an overview of the development process, and an exploration of potential avenues for future enhancements.
 
 ### 4.1 Software Architecture
 
